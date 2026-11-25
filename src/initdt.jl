@@ -23,7 +23,8 @@ function ode_initdt(integrator)
     return _ode_initdt_iip(
         integrator.u, integrator.t, integrator.tdir, integrator.opts.dtmax,
         integrator.opts.abstol, integrator.opts.reltol, ode_default_norm,
-        integrator.f, integrator.p, alg_order(integrator.alg), integrator
+        integrator.f, integrator.p,
+        get_current_alg_order(integrator.alg, integrator.cache), integrator
     )
 end
 
