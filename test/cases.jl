@@ -23,7 +23,10 @@ const TOLERANCES = (
     tight = (; reltol = 1.0e-10, abstol = 1.0e-10),
 )
 
-const ALGORITHMS = (LeanODE.Tsit5(), LeanODE.RK4())
+const ALGORITHMS = (
+    LeanODE.Tsit5(), LeanODE.RK4(), LeanODE.BS3(),
+    LeanODE.VCABM3(), LeanODE.VCABM4(), LeanODE.VCABM5(), LeanODE.VCABM(),
+)
 
 """
     special_cases()
@@ -97,11 +100,24 @@ function special_cases()
 end
 
 """
+    RETCODE_EXCEPTIONS
+
+Special cases that end differently with one method, as
+`(method, label) => return code`. Without step-size control, OrdinaryDiffEq's
+VCABM stays at order 1 and evaluates `f` only at the predicted state, and
+that is unstable for the Lorenz system at a step size of 0.03.
+"""
+const RETCODE_EXCEPTIONS = Dict(
+    (LeanODE.VCABM, "fixed step that does not divide the span") => :Unstable,
+)
+
+"""
     comparison_cases()
 
 All comparisons, as named tuples `(; group, label, problem, alg, keywords, retcode)`.
 `group` is the testset the case is reported under; `retcode` is as in
-[`special_cases`](@ref), and `nothing` for the grid.
+[`special_cases`](@ref) unless `RETCODE_EXCEPTIONS` names another, and
+`nothing` for the grid.
 """
 function comparison_cases()
     cases = NamedTuple[]
@@ -111,7 +127,8 @@ function comparison_cases()
             push!(cases, (; group = String(name), label = "$name, $tol_name, $save_name", problem, alg, keywords = merge(tol, save), retcode = nothing))
         end
         for (label, problem, keywords, retcode) in special_cases()
-            push!(cases, (; group = "special cases", label, problem, alg, keywords, retcode))
+            expected = get(RETCODE_EXCEPTIONS, (typeof(alg), label), retcode)
+            push!(cases, (; group = "special cases", label, problem, alg, keywords, retcode = expected))
         end
     end
     return cases

@@ -75,7 +75,8 @@ end
 """
     LeanAlgorithm
 
-Supertype of the integration methods (`Tsit5`, `RK4`).
+Supertype of the integration methods (`Tsit5`, `RK4`, `BS3`, `VCABM`,
+`VCABM3`, `VCABM4`, `VCABM5`).
 """
 abstract type LeanAlgorithm end
 

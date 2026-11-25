@@ -1,8 +1,7 @@
 # Copied from OrdinaryDiffEqLowOrderRK 1.13.0 (src/low_order_rk_caches.jl,
-# src/fixed_timestep_perform_step.jl) and OrdinaryDiffEqCore 3.33.1
-# (src/dense/generic_dense.jl, `hermite_interpolant!` for `Array`), MIT licence;
-# see LICENSE.md. Only the in-place method for `Array` states is kept, without
-# stage and step limiters; the broadcasts stay `@..`, as in tsit5.jl.
+# src/fixed_timestep_perform_step.jl), MIT licence; see LICENSE.md. Only the
+# in-place method for `Array` states is kept, without stage and step limiters;
+# the broadcasts stay `@..`, as in tsit5.jl.
 
 """
     RK4()
@@ -180,32 +179,4 @@ points `σ₁,₂ = 1/2 ∓ √3/6` and store it, scaled by 2.1342, in
         integrator.stats.nf += 2
     end
     return nothing
-end
-
-"""
-    _dv(differential_vars, i)
-
-Whether component `i` is differential; always `true` here (no algebraic
-components), kept so that the interpolant reads as upstream.
-"""
-@inline _dv(dv::Bool, _) = dv
-
-"""
-    interpolant!(out, Θ, dt, y₀, y₁, k, cache::RK4Cache)
-
-Cubic Hermite interpolation (Hairer, Nørsett and Wanner, Solving ODEs I,
-p. 190) through `y₀`, `y₁` with derivatives `k[1] = f(y₀)`, `k[2] = f(y₁)`,
-at `tprev + Θ dt`. This is OrdinaryDiffEq's default for methods without their
-own interpolant. Returns `out`.
-"""
-@muladd function interpolant!(
-        out::Array, Θ, dt, y₀, y₁, k, cache::RK4Cache
-    )
-    differential_vars = true
-    @inbounds @simd ivdep for i in eachindex(out)
-        out[i] = (1 - Θ) * y₀[i] + Θ * y₁[i] +
-            _dv(differential_vars, i) * Θ * (Θ - 1) *
-            ((1 - 2Θ) * (y₁[i] - y₀[i]) + (Θ - 1) * dt * k[1][i] + Θ * dt * k[2][i])
-    end
-    return out
 end

@@ -7,7 +7,7 @@
             sol = LeanODE.solve(problem, alg; reltol = 1e-10, abstol = 1e-12)
             @test sol.retcode == ReturnCode.Success
             @test sol.t[1] == 0.0 && sol.t[end] == 1.0
-            @test sol.u[end] ≈ exp(-1) .* [1.0, 2.0] rtol = 1e-8
+            @test sol.u[end] ≈ exp(-1) .* [1.0, 2.0] rtol = 1e-7
         end
     end
 

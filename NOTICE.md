@@ -19,4 +19,9 @@ the source file and the version it was copied from. Their licences are in
 | `src/solve.jl` | OrdinaryDiffEqCore.jl 3.33.1, `src/solve.jl`, `src/integrators/integrator_utils.jl`, `src/integrators/integrator_interface.jl`; SciMLBase.jl 2.155.2, `src/integrator_interface.jl` |
 | `src/tsit5_tableaus.jl` | OrdinaryDiffEqTsit5.jl 1.12.0, `src/tsit_tableaus.jl` (unchanged, docstrings added) |
 | `src/tsit5.jl` | OrdinaryDiffEqTsit5.jl 1.12.0, `src/tsit_caches.jl`, `src/tsit_perform_step.jl`, `src/interpolants.jl` |
-| `src/rk4.jl` | OrdinaryDiffEqLowOrderRK.jl 1.13.0, `src/low_order_rk_caches.jl`, `src/fixed_timestep_perform_step.jl`; OrdinaryDiffEqCore.jl 3.33.1, `src/dense/generic_dense.jl` |
+| `src/rk4.jl` | OrdinaryDiffEqLowOrderRK.jl 1.13.0, `src/low_order_rk_caches.jl`, `src/fixed_timestep_perform_step.jl` |
+| `src/bs3.jl` | OrdinaryDiffEqLowOrderRK.jl 1.13.0, `src/low_order_rk_tableaus.jl`, `src/low_order_rk_caches.jl`, `src/low_order_rk_perform_step.jl` |
+| `src/adams_caches.jl` | OrdinaryDiffEqAdamsBashforthMoulton.jl 1.11.0, `src/algorithms.jl`, `src/alg_utils.jl`, `src/adams_bashforth_moulton_caches.jl` |
+| `src/adams_utils.jl` | OrdinaryDiffEqAdamsBashforthMoulton.jl 1.11.0, `src/adams_utils.jl` |
+| `src/adams_perform_step.jl` | OrdinaryDiffEqAdamsBashforthMoulton.jl 1.11.0, `src/adams_bashforth_moulton_perform_step.jl` |
+| `src/hermite.jl` | OrdinaryDiffEqCore.jl 3.33.1, `src/dense/generic_dense.jl` |

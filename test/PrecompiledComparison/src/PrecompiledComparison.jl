@@ -14,7 +14,8 @@ sides; calling [`run_all`](@ref) afterwards runs that code.
 module PrecompiledComparison
 
 using LeanODE
-import OrdinaryDiffEqCore, OrdinaryDiffEqTsit5, OrdinaryDiffEqLowOrderRK, SciMLBase
+import OrdinaryDiffEqCore, OrdinaryDiffEqTsit5, OrdinaryDiffEqLowOrderRK,
+    OrdinaryDiffEqAdamsBashforthMoulton, SciMLBase
 using Logging: NullLogger, with_logger
 
 const TESTDIR = joinpath(@__DIR__, "..", "..")

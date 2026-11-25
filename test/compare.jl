@@ -3,6 +3,11 @@
 """The OrdinaryDiffEq method that LeanODE's `alg` was copied from."""
 reference_alg(::LeanODE.Tsit5) = OrdinaryDiffEqTsit5.Tsit5()
 reference_alg(::LeanODE.RK4) = OrdinaryDiffEqLowOrderRK.RK4()
+reference_alg(::LeanODE.BS3) = OrdinaryDiffEqLowOrderRK.BS3()
+reference_alg(::LeanODE.VCABM3) = OrdinaryDiffEqAdamsBashforthMoulton.VCABM3()
+reference_alg(::LeanODE.VCABM4) = OrdinaryDiffEqAdamsBashforthMoulton.VCABM4()
+reference_alg(::LeanODE.VCABM5) = OrdinaryDiffEqAdamsBashforthMoulton.VCABM5()
+reference_alg(::LeanODE.VCABM) = OrdinaryDiffEqAdamsBashforthMoulton.VCABM()
 
 """
     both_solutions(problem, alg; kwargs...)

@@ -660,7 +660,7 @@ uuid = "aea7be01-6a6a-4083-8856-8a6e6704d82a"
 version = "1.4.0"
 
 [[deps.PrecompiledComparison]]
-deps = ["LeanODE", "Logging", "OrdinaryDiffEqCore", "OrdinaryDiffEqLowOrderRK", "OrdinaryDiffEqTsit5", "SciMLBase"]
+deps = ["LeanODE", "Logging", "OrdinaryDiffEqAdamsBashforthMoulton", "OrdinaryDiffEqCore", "OrdinaryDiffEqLowOrderRK", "OrdinaryDiffEqTsit5", "SciMLBase"]
 path = "PrecompiledComparison"
 uuid = "40a49816-5504-4e76-a76f-35648eb70f99"
 version = "0.1.0"

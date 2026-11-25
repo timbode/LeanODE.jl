@@ -502,7 +502,7 @@ end
 """
     solve(prob, alg; kwargs...)
 
-Integrate `prob` with the method `alg` (`Tsit5()` or `RK4()`) and return an
+Integrate `prob` with the method `alg` (such as `Tsit5()` or `VCABM()`) and return an
 [`ODESolution`](@ref). The keywords and their defaults are OrdinaryDiffEq's:
 
 - `abstol = 1e-6`, `reltol = 1e-3`: absolute and relative tolerance, one
