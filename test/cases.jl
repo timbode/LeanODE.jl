@@ -53,12 +53,31 @@ function special_cases()
         ("NaN after t = 0.5", (f! = nan_after!, u0 = [1.0, 2.0], tspan = (0.0, 1.0), p = 0.5), (;), :Unstable),
         ("blow-up", blowup, (;), :Unstable),
         ("blow-up with dtmin", blowup, (; dtmin = 1.0e-3), :DtLessThanMin),
+        ("blow-up of a complex state", merge(blowup, (; u0 = ComplexF64[1, 0.5])), (;), :Unstable),
         ("dt = NaN", P.decay, (; dt = NaN), :DtNaN),
         ("NaN in the initial state", merge(P.decay, (; u0 = [NaN, 1.0])), (;), :DtNaN),
         ("Inf in the initial state", merge(P.decay, (; u0 = [Inf, 1.0])), (;), :DtNaN),
+        # early stops that save only the end: the state saved last is whatever the
+        # final attempted step left behind. Tsit5 rejects its 14th attempted step
+        # of this problem and RK4 its 21st, so each method stops once right after
+        # a rejected step and once right after an accepted one.
+        ("maxiters = 14, only the end saved", P.van_der_pol, (; maxiters = 14, save_everystep = false), :MaxIters),
+        ("maxiters = 21, only the end saved", P.van_der_pol, (; maxiters = 21, save_everystep = false), :MaxIters),
+        ("NaN after t = 0.5, only the end saved", (f! = nan_after!, u0 = [1.0, 2.0], tspan = (0.0, 1.0), p = 0.5), (; save_everystep = false), :Unstable),
+        ("blow-up, only the end saved", blowup, (; save_everystep = false), :Unstable),
+        ("blow-up with dtmin, only the end saved", blowup, (; dtmin = 1.0e-3, save_everystep = false), :DtLessThanMin),
         # unusual problems
         ("zero initial state", merge(P.decay, (; u0 = [0.0, 0.0])), (;), :Success),
         ("time span of length zero", merge(P.decay, (; tspan = (1.0, 1.0))), (;), :Success),
+        # one representable number apart. An adaptive solve stops at once, because
+        # no step size fits; with fixed steps, forwards is a single step of that
+        # length and backwards across a power of two is a step too short to take,
+        # which is accepted without being taken.
+        ("time span of one ulp", merge(P.decay, (; tspan = (1.0, nextfloat(1.0)))), (;), :Unstable),
+        ("time span of one ulp, backwards", merge(P.decay, (; tspan = (2.0, prevfloat(2.0)))), (;), :Unstable),
+        ("time span of one ulp, fixed step", merge(P.decay, (; tspan = (1.0, nextfloat(1.0)))), (; adaptive = false, dt = 0.5), :Success),
+        ("time span of one ulp, backwards, fixed step", merge(P.decay, (; tspan = (2.0, prevfloat(2.0)))), (; adaptive = false, dt = 0.5), :Success),
+        ("time span of one ulp, backwards, fixed step, saveat", merge(P.decay, (; tspan = (2.0, prevfloat(2.0)))), (; adaptive = false, dt = 0.5, saveat = [prevfloat(2.0)]), :Success),
         ("empty state", merge(P.decay, (; u0 = Float64[])), (;), :Success),
         ("integer time span", merge(P.decay, (; tspan = (0, 2))), (;), :Success),
         ("three-dimensional state", merge(P.decay, (; u0 = reshape(collect(1.0:24.0), 2, 3, 4))), (;), :Success),

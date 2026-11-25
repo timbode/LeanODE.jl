@@ -120,7 +120,7 @@ function init(prob::ODEProblem, alg::LeanAlgorithm, settings)
         opts.qoldinit,      # qold
         1.0,                # q11
         0, 0, 0,            # iter, success_iter, saveiter
-        false, false, zero(t), true,
+        false, false, zero(t), true, false,
         ReturnCode.Default, Float64[], typeof(u)[]
     )
     opts.save_start && save_current!(integrator)
@@ -179,15 +179,46 @@ end
 """
     apply_step!(integrator)
 
-Make the accepted step the starting point of the next: copy `u` to `uprev`
-and `f(u)` to `f(uprev)` (first same as last), and take the proposed step
-size.
+Make the accepted step the starting point of the next: `u` becomes `uprev`
+and `f(u)` becomes `f(uprev)` (first same as last), and the proposed step
+size is taken.
+
+OrdinaryDiffEq copies `u` into `uprev` and `fsallast` into `fsalfirst`. Here
+the arrays are exchanged instead, which saves two passes over the state per
+step and changes no value that is read afterwards: the next step overwrites
+`u` and `fsallast` before reading them. Until then `state_in_uprev` marks
+`u` as outdated.
 """
 function apply_step!(integrator)
-    copyto!(integrator.uprev, integrator.u)
+    exchange_state!(integrator)
     integrator.dt = integrator.dtpropose
-    copyto!(integrator.fsalfirst, integrator.fsallast)
     modify_dt_for_tstops!(integrator)
+    return nothing
+end
+
+"""
+    exchange_state!(integrator)
+
+Exchange `u` with `uprev` and `fsallast` with `fsalfirst`, unless that was
+already done since the last step. The second case arises when a step is
+accepted without being taken (see `handle_tstop_step!`).
+"""
+function exchange_state!(integrator)
+    integrator.state_in_uprev && return nothing
+    integrator.u, integrator.uprev = integrator.uprev, integrator.u
+    exchange_fsal!(integrator, integrator.cache)
+    integrator.state_in_uprev = true
+    return nothing
+end
+
+"""
+    perform_step!(integrator)
+
+Take one step with the integrator's method. Afterwards `u` holds the result.
+"""
+function perform_step!(integrator)
+    perform_step!(integrator, integrator.cache)
+    integrator.state_in_uprev = false
     return nothing
 end
 
@@ -286,7 +317,7 @@ function handle_tstop_step!(integrator)
     if integrator.t isa AbstractFloat && abs(integrator.dt) < eps(abs(integrator.t))
         integrator.accept_step = true
     else
-        perform_step!(integrator, integrator.cache)
+        perform_step!(integrator)
     end
     return nothing
 end
@@ -412,7 +443,7 @@ function check_error(integrator)
             return ReturnCode.Unstable
         end
     end
-    if step_accepted && infinite_or_giant(integrator.u)
+    if step_accepted && infinite_or_giant(latest_state(integrator))
         return ReturnCode.Unstable
     end
     return ReturnCode.Success
@@ -451,7 +482,7 @@ function solve!(integrator)
             if integrator.next_step_tstop
                 handle_tstop_step!(integrator)
             else
-                perform_step!(integrator, integrator.cache)
+                perform_step!(integrator)
             end
             should_exit = integrator.next_step_tstop
             loopfooter!(integrator)

@@ -32,6 +32,18 @@
         @test_throws ArgumentError LeanODE.ODEProblem(decay!, Float32[1, 2], (0.0, 1.0), 1.0)
     end
 
+    @testset "the finiteness check equals any(!isfinite, u)" begin
+        finite = [0.0, -0.0, 1.0, -1.0, floatmax(), -floatmax(), floatmin(), 5.0e-324]
+        for n in (0, 1, 2, 3, 7, 8, 9, 16, 17, 33), bad in (1.0, Inf, -Inf, NaN), position in unique((1, max(n, 1)))
+            x = [finite[mod1(i, length(finite))] for i in 1:n]
+            n > 0 && (x[position] = bad)
+            @test LeanODE.infinite_or_giant(x) == any(!isfinite, x)
+            for z in (complex.(x, 1.0), complex.(1.0, x), reshape(complex.(x, x), :, 1))
+                @test LeanODE.infinite_or_giant(z) == any(!isfinite, z)
+            end
+        end
+    end
+
     @testset "a tolerance per component is refused" begin
         problem = LeanODE.ODEProblem(decay!, [1.0, 2.0], (0.0, 1.0), 1.0)
         @test_throws ArgumentError LeanODE.solve(problem, LeanODE.Tsit5(); abstol = [1.0e-6, 1.0e-8])

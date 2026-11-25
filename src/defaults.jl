@@ -61,7 +61,24 @@ timedepentdtmin(t::AbstractFloat, dtmin) = abs(max(eps(t), dtmin))
     infinite_or_giant(u)
 
 `true` if any component of `u` is infinite or NaN. This is OrdinaryDiffEq's
-default instability check (`ODE_DEFAULT_UNSTABLE_CHECK`).
+default instability check (`ODE_DEFAULT_UNSTABLE_CHECK`), which is
+`any(!isfinite, u)`. The loop here gives the same answer but does not stop at
+the first hit, so it has no branch and is vectorised; the check runs after
+every accepted step, on states that are almost always finite.
 """
-infinite_or_giant(x::Number) = !isfinite(x)
-infinite_or_giant(x::AbstractArray) = any(infinite_or_giant, x)
+function infinite_or_giant(x::Array{<:Union{Float64, ComplexF64}})
+    found = false
+    @inbounds @simd for i in eachindex(x)
+        found |= not_finite(x[i])
+    end
+    return found
+end
+
+"""
+    not_finite(x)
+
+`!isfinite(x)`, from the bits: a `Float64` is infinite or NaN exactly if all
+eleven bits of its exponent are set. A complex number is tested by its parts.
+"""
+@inline not_finite(x::Float64) = reinterpret(UInt64, x) & 0x7ff0000000000000 == 0x7ff0000000000000
+@inline not_finite(z::ComplexF64) = not_finite(real(z)) | not_finite(imag(z))

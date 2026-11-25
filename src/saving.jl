@@ -35,7 +35,7 @@ the solution.
 function save_current!(integrator)
     integrator.saveiter += 1
     copyat_or_push!(integrator.ts, integrator.saveiter, integrator.t)
-    copyat_or_push!(integrator.us, integrator.saveiter, integrator.u)
+    copyat_or_push!(integrator.us, integrator.saveiter, latest_state(integrator))
     return nothing
 end
 
@@ -78,7 +78,7 @@ function savevalues!(integrator)
                 continue
             end
             copyat_or_push!(integrator.ts, integrator.saveiter, integrator.t)
-            copyat_or_push!(integrator.us, integrator.saveiter, integrator.u)
+            copyat_or_push!(integrator.us, integrator.saveiter, latest_state(integrator))
         end
     end
     if integrator.opts.save_everystep &&

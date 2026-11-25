@@ -27,12 +27,11 @@ alg_order(::RK4) = 4
 
 Work arrays of RK4: the stage derivatives `fsalfirst` (`k₁`), `k₂`, `k₃`,
 `k₄` and `k` (`f` at the new state), a stage state `tmp`, and the scaled
-error `atmp`. `u` and `uprev` are the integrator's arrays; `thread` selects
-FastBroadcast's serial kernel.
+error `atmp`. `thread` selects FastBroadcast's serial kernel. The struct is
+mutable because `fsalfirst` and `k` change places after every accepted step
+(see `exchange_fsal!`).
 """
-struct RK4Cache{uType}
-    u::uType
-    uprev::uType
+mutable struct RK4Cache{uType}
     fsalfirst::uType
     k₂::uType
     k₃::uType
@@ -57,7 +56,7 @@ function alg_cache(::RK4, u, rate_prototype, uprev)
     tmp = zero(u)
     atmp = similar(u, eltype(u))
     fill!(atmp, false)
-    return RK4Cache(u, uprev, k₁, k₂, k₃, k₄, k, tmp, atmp, FastBroadcast.False())
+    return RK4Cache(k₁, k₂, k₃, k₄, k, tmp, atmp, FastBroadcast.False())
 end
 
 """
@@ -66,6 +65,18 @@ end
 The arrays that hold `f(uprev)` and `f(u)`: `fsalfirst` and `k`.
 """
 get_fsalfirstlast(cache::RK4Cache) = (cache.fsalfirst, cache.k)
+
+"""
+    exchange_fsal!(integrator, cache::RK4Cache)
+
+Exchange `fsalfirst` and `k`, the arrays that hold `f(uprev)` and `f(u)`.
+"""
+function exchange_fsal!(integrator, cache::RK4Cache)
+    cache.fsalfirst, cache.k = cache.k, cache.fsalfirst
+    integrator.fsalfirst = integrator.k[1] = cache.fsalfirst
+    integrator.fsallast = integrator.k[2] = cache.k
+    return nothing
+end
 
 """
     initialize!(integrator, cache::RK4Cache)

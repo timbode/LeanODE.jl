@@ -57,6 +57,12 @@ size `dt`. `k` holds the stage derivatives the method's interpolant needs;
 `fsalfirst` is `f(uprev)` and `fsallast` is `f(u)`, since both methods reuse
 the last stage of one step as the first stage of the next.
 
+`u` and `uprev`, and likewise `fsalfirst` and `fsallast`, are not copied into
+each other after an accepted step, as OrdinaryDiffEq does, but exchanged (see
+`apply_step!`). From that exchange until the next step is taken, the newest
+state is in `uprev`, `u` and `fsallast` hold older data, and `state_in_uprev`
+is `true`. Code that needs the newest state calls [`latest_state`](@ref).
+
 `ts` and `us` collect the saved times and states; `saveiter` counts them.
 `tspan_end` is the end of the time span.
 The remaining fields are the step-control state of OrdinaryDiffEq, with the
@@ -94,7 +100,17 @@ mutable struct Integrator{uType, F, P, Alg, Cache, S}
     next_step_tstop::Bool
     tstop_target::Float64
     do_error_check::Bool
+    state_in_uprev::Bool
     retcode::ReturnCode.T
     ts::Vector{Float64}
     us::Vector{uType}
 end
+
+"""
+    latest_state(integrator)
+
+The array that holds the newest state: `integrator.u` after a step, and
+`integrator.uprev` between `apply_step!` and the next step. OrdinaryDiffEq's
+`integrator.u` has these values at the same points of the loop.
+"""
+latest_state(integrator) = integrator.state_in_uprev ? integrator.uprev : integrator.u

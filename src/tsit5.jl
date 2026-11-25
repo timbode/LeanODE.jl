@@ -27,12 +27,10 @@ alg_order(::Tsit5) = 5
 
 Work arrays of Tsit5: the stage derivatives `k1`–`k7`, the error estimate
 `utilde`, a stage state `tmp`, and the scaled error `atmp`. `thread` selects
-FastBroadcast's serial kernel. `u` and `uprev`
-are the integrator's arrays.
+FastBroadcast's serial kernel. The struct is mutable because `k1` and `k7`
+change places after every accepted step (see `exchange_fsal!`).
 """
-struct Tsit5Cache{uType}
-    u::uType
-    uprev::uType
+mutable struct Tsit5Cache{uType}
     k1::uType
     k2::uType
     k3::uType
@@ -64,7 +62,7 @@ function alg_cache(::Tsit5, u, rate_prototype, uprev)
     atmp = similar(u, eltype(u))
     fill!(atmp, false)
     tmp = zero(u)
-    return Tsit5Cache(u, uprev, k1, k2, k3, k4, k5, k6, k7, utilde, tmp, atmp, FastBroadcast.False())
+    return Tsit5Cache(k1, k2, k3, k4, k5, k6, k7, utilde, tmp, atmp, FastBroadcast.False())
 end
 
 """
@@ -74,6 +72,20 @@ The arrays that hold `f(uprev)` and `f(u)`: for Tsit5 the first and the last
 stage, `k1` and `k7`.
 """
 get_fsalfirstlast(cache::Tsit5Cache) = (cache.k1, cache.k7)
+
+"""
+    exchange_fsal!(integrator, cache)
+
+Exchange the arrays that hold `f(uprev)` and `f(u)`, in the cache, in
+`integrator.fsalfirst` and `integrator.fsallast`, and in the stages
+`integrator.k` that the interpolant reads. For Tsit5 these are `k1` and `k7`.
+"""
+function exchange_fsal!(integrator, cache::Tsit5Cache)
+    cache.k1, cache.k7 = cache.k7, cache.k1
+    integrator.fsalfirst = integrator.k[1] = cache.k1
+    integrator.fsallast = integrator.k[7] = cache.k7
+    return nothing
+end
 
 """
     initialize!(integrator, cache)
