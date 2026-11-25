@@ -1,0 +1,26 @@
+[deps]
+DiffEqBase = "2b5f629d-d688-5b77-993f-72d75c75574e"
+FastBroadcast = "7034ab61-46d4-4ed7-9d0f-46aef9175898"
+FastPower = "a4df4552-cc26-4903-aec0-212e50a0e84b"
+LeanODE = "c86d6785-5fd8-4c08-817e-7d1d1bc4b9b4"
+MuladdMacro = "46d2c3a1-f734-5fdb-9937-b9b9aeba4221"
+OrdinaryDiffEqAdamsBashforthMoulton = "89bda076-bce5-4f1c-845f-551c83cdda9a"
+OrdinaryDiffEqCore = "bbf590c4-e513-4bbe-9b18-05decba2e5d8"
+OrdinaryDiffEqLowOrderRK = "1344f307-1e59-4825-a18e-ace9aa3fa4c6"
+OrdinaryDiffEqTsit5 = "b1df2697-797e-41e3-8120-5422d3b24e4a"
+SciMLBase = "0bca4576-84f4-4d90-8ffe-ffa030f20462"
+Test = "8dfed614-e22c-5e08-85e1-65c5234f0b40"
+
+[sources]
+LeanODE = {path = ".."}
+
+[compat]
+DiffEqBase = "=6.218.0"
+FastBroadcast = "=1.5.1"
+FastPower = "=1.5.1"
+MuladdMacro = "=0.2.7"
+OrdinaryDiffEqAdamsBashforthMoulton = "=1.11.0"
+OrdinaryDiffEqCore = "=3.33.1"
+OrdinaryDiffEqLowOrderRK = "=1.13.0"
+OrdinaryDiffEqTsit5 = "=1.12.0"
+SciMLBase = "=2.155.2"
