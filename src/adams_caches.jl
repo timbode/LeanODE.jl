@@ -1,6 +1,7 @@
-# Copied from OrdinaryDiffEqAdamsBashforthMoulton 1.11.0 (src/algorithms.jl,
+# After OrdinaryDiffEqAdamsBashforthMoulton 1.11.0 (src/algorithms.jl,
 # src/alg_utils.jl, src/adams_bashforth_moulton_caches.jl), MIT licence; see
-# LICENSE.md. Only the caches for in-place problems are kept.
+# LICENSE.md. The methods are OrdinaryDiffEq's; the caches hold only what
+# LeanODE's sweeps over the state need (adams_utils.jl).
 
 """
     VCABM3()
@@ -74,310 +75,115 @@ current order.
 get_current_adaptive_order(alg::VCABM, cache) = cache.order
 
 """
-    VCABM3Cache
+    AdamsCache
 
-Work arrays of VCABM3. `fsalfirst` and `k4` hold `f(uprev)` and `f(u)`;
-`bs3cache` is the cache of the BS3 steps that start the method. `dts` holds
-the last three step sizes, newest first, and `step` counts the steps taken
-so far, up to the order. `ϕ_n`, `ϕstar_n`, `ϕstar_nm1` and `ϕ_np1` are the
-divided differences and `β`, `c`, `g` the coefficients of `adams_utils.jl`.
-`utilde` is the error estimate, `atmp` the scaled error and `tmp` scratch
-space; `tab` holds BS3's coefficients, and `thread` selects FastBroadcast's
-serial kernel.
-"""
-mutable struct VCABM3Cache{uType, TabType, bs3Type}
-    fsalfirst::uType
-    bs3cache::bs3Type
-    k4::uType
-    ϕstar_nm1::Vector{uType}
-    dts::Vector{Float64}
-    c::Matrix{Float64}
-    g::Vector{Float64}
-    ϕ_n::Vector{uType}
-    ϕ_np1::Vector{uType}
-    ϕstar_n::Vector{uType}
-    β::Vector{Float64}
-    order::Int
-    atmp::uType
-    tmp::uType
-    utilde::uType
-    tab::TabType
-    step::Int
-    thread::FastBroadcast.False
-end
+Work arrays of an Adams method with variable step size, for orders up to
+`max_order`.
 
+# Fields
+- `fsalfirst`, `k4`: `f(uprev)` and `f(u)`.
+- `starter`: the cache of the Runge–Kutta method that takes the first steps
+  of a fixed-order method; `nothing` for the variable-order method.
+- `ϕstar_n`, `ϕstar_nm1`: the divided differences ϕ*ᵢ of this step and of the
+  last one (see adams_utils.jl), `max_order + 1` arrays each. They change
+  places after every accepted step.
+- `ϕ_k`: the difference ϕₖ(n) of the current order.
+- `ψ`: a block vector of length `BLOCK`, scratch space of the sweeps.
+- `tmp`: scratch space for the initial step size.
+- `dts`: the last step sizes, newest first.
+- `β`, `c`, `g`: the coefficients of adams_utils.jl.
+- `ξ`, `ξ0`: the sums of step sizes that `β_coefs!` ended with.
+- `order`: the order of the next step, and `max_order` its bound.
+- `step`: for a fixed-order method, one more than the number of steps
+  attempted so far, up to `order`; below `order` the next step is a
+  Runge–Kutta step.
 """
-    alg_cache(::VCABM3, u, rate_prototype, uprev)
-
-Allocate the work arrays of VCABM3 for states like `u`.
-"""
-function alg_cache(alg::VCABM3, u, rate_prototype, uprev)
-    t = dt = 0.0
-    tab = BS3ConstantCache(constvalue(recursive_unitless_bottom_eltype(u)), Float64)
-    bs3cache = alg_cache(BS3(), u, rate_prototype, uprev)
-    fsalfirst = zero(rate_prototype)
-    k4 = zero(rate_prototype)
-    dts = fill(zero(dt), 3)
-    c = fill(zero(t), 4, 4)
-    g = fill(zero(t), 4)
-    ϕ_n = Vector{typeof(rate_prototype)}(undef, 3)
-    ϕstar_nm1 = Vector{typeof(rate_prototype)}(undef, 3)
-    ϕstar_n = Vector{typeof(rate_prototype)}(undef, 3)
-    ϕ_np1 = Vector{typeof(rate_prototype)}(undef, 4)
-    for i in 1:3
-        ϕ_n[i] = zero(rate_prototype)
-        ϕstar_nm1[i] = zero(rate_prototype)
-        ϕstar_n[i] = zero(rate_prototype)
-    end
-    for i in 1:4
-        ϕ_np1[i] = zero(rate_prototype)
-    end
-    β = fill(zero(t), 3)
-    order = 3
-    atmp = similar(u, eltype(u))
-    fill!(atmp, false)
-    tmp = zero(u)
-    utilde = zero(u)
-    return VCABM3Cache(
-        fsalfirst, bs3cache, k4, ϕstar_nm1, dts, c, g, ϕ_n, ϕ_np1,
-        ϕstar_n, β, order, atmp, tmp, utilde, tab, 1, FastBroadcast.False()
-    )
-end
-
-"""
-    VCABM4Cache
-
-Work arrays of VCABM4, as `VCABM3Cache`, with four step sizes in `dts` and
-`rk4cache`, the cache of the RK4 steps that start the method.
-"""
-mutable struct VCABM4Cache{uType, rk4cacheType}
-    fsalfirst::uType
-    rk4cache::rk4cacheType
-    k4::uType
-    ϕstar_nm1::Vector{uType}
-    dts::Vector{Float64}
-    c::Matrix{Float64}
-    g::Vector{Float64}
-    ϕ_n::Vector{uType}
-    ϕ_np1::Vector{uType}
-    ϕstar_n::Vector{uType}
-    β::Vector{Float64}
-    order::Int
-    atmp::uType
-    tmp::uType
-    utilde::uType
-    step::Int
-    thread::FastBroadcast.False
-end
-
-"""
-    alg_cache(::VCABM4, u, rate_prototype, uprev)
-
-Allocate the work arrays of VCABM4 for states like `u`.
-"""
-function alg_cache(alg::VCABM4, u, rate_prototype, uprev)
-    t = dt = 0.0
-    rk4cache = alg_cache(RK4(), u, rate_prototype, uprev)
-    fsalfirst = zero(rate_prototype)
-    k4 = zero(rate_prototype)
-    dts = fill(zero(dt), 4)
-    c = fill(zero(t), 5, 5)
-    g = fill(zero(t), 5)
-    ϕ_n = Vector{typeof(rate_prototype)}(undef, 4)
-    ϕstar_nm1 = Vector{typeof(rate_prototype)}(undef, 4)
-    ϕstar_n = Vector{typeof(rate_prototype)}(undef, 4)
-    ϕ_np1 = Vector{typeof(rate_prototype)}(undef, 5)
-    for i in 1:4
-        ϕ_n[i] = zero(rate_prototype)
-        ϕstar_nm1[i] = zero(rate_prototype)
-        ϕstar_n[i] = zero(rate_prototype)
-    end
-    for i in 1:5
-        ϕ_np1[i] = zero(rate_prototype)
-    end
-    β = fill(zero(t), 4)
-    order = 4
-    atmp = similar(u, eltype(u))
-    fill!(atmp, false)
-    tmp = zero(u)
-    utilde = zero(u)
-    return VCABM4Cache(
-        fsalfirst, rk4cache, k4, ϕstar_nm1, dts, c, g, ϕ_n, ϕ_np1,
-        ϕstar_n, β, order, atmp, tmp, utilde, 1, FastBroadcast.False()
-    )
-end
-
-"""
-    VCABM5Cache
-
-Work arrays of VCABM5, as `VCABM4Cache`, with five step sizes in `dts`.
-"""
-mutable struct VCABM5Cache{uType, rk4cacheType}
-    fsalfirst::uType
-    rk4cache::rk4cacheType
-    k4::uType
-    ϕstar_nm1::Vector{uType}
-    dts::Vector{Float64}
-    c::Matrix{Float64}
-    g::Vector{Float64}
-    ϕ_n::Vector{uType}
-    ϕ_np1::Vector{uType}
-    ϕstar_n::Vector{uType}
-    β::Vector{Float64}
-    order::Int
-    atmp::uType
-    tmp::uType
-    utilde::uType
-    step::Int
-    thread::FastBroadcast.False
-end
-
-"""
-    alg_cache(::VCABM5, u, rate_prototype, uprev)
-
-Allocate the work arrays of VCABM5 for states like `u`.
-"""
-function alg_cache(alg::VCABM5, u, rate_prototype, uprev)
-    t = dt = 0.0
-    rk4cache = alg_cache(RK4(), u, rate_prototype, uprev)
-    fsalfirst = zero(rate_prototype)
-    k4 = zero(rate_prototype)
-    dts = fill(zero(dt), 5)
-    c = fill(zero(t), 6, 6)
-    g = fill(zero(t), 6)
-    ϕ_n = Vector{typeof(rate_prototype)}(undef, 5)
-    ϕstar_nm1 = Vector{typeof(rate_prototype)}(undef, 5)
-    ϕstar_n = Vector{typeof(rate_prototype)}(undef, 5)
-    ϕ_np1 = Vector{typeof(rate_prototype)}(undef, 6)
-    for i in 1:5
-        ϕ_n[i] = zero(rate_prototype)
-        ϕstar_nm1[i] = zero(rate_prototype)
-        ϕstar_n[i] = zero(rate_prototype)
-    end
-    for i in 1:6
-        ϕ_np1[i] = zero(rate_prototype)
-    end
-    β = fill(zero(t), 5)
-    order = 5
-    atmp = similar(u, eltype(u))
-    fill!(atmp, false)
-    tmp = zero(u)
-    utilde = zero(u)
-    return VCABM5Cache(
-        fsalfirst, rk4cache, k4, ϕstar_nm1, dts, c, g, ϕ_n, ϕ_np1,
-        ϕstar_n, β, order, atmp, tmp, utilde, 1, FastBroadcast.False()
-    )
-end
-
-"""
-    VCABMCache
-
-Work arrays of the variable-order VCABM, sized for its largest order 12.
-Beyond the fields of `VCABM3Cache`: `order` is the current order and
-`max_order` its bound; `ξ` and `ξ0` are sums of step sizes kept between
-`ϕ_and_ϕstar!` and `expand_ϕ_and_ϕstar!`; `utildem2`, `utildem1` and
-`utildep1` are the error estimates of the orders two below, one below and
-one above the current one, and `atmpm2`, `atmpm1`, `atmpp1` their scaled
-errors.
-"""
-mutable struct VCABMCache{uType}
+mutable struct AdamsCache{Alg, uType, Starter, T}
     fsalfirst::uType
     k4::uType
+    starter::Starter
+    ϕstar_n::Vector{uType}
     ϕstar_nm1::Vector{uType}
+    ϕ_k::uType
+    ψ::Vector{T}
+    tmp::uType
     dts::Vector{Float64}
+    β::Vector{Float64}
     c::Matrix{Float64}
     g::Vector{Float64}
-    ϕ_n::Vector{uType}
-    ϕ_np1::Vector{uType}
-    ϕstar_n::Vector{uType}
-    β::Vector{Float64}
-    order::Int
-    max_order::Int
-    atmp::uType
-    tmp::uType
     ξ::Float64
     ξ0::Float64
-    utilde::uType
-    utildem1::uType
-    utildem2::uType
-    utildep1::uType
-    atmpm1::uType
-    atmpm2::uType
-    atmpp1::uType
+    order::Int
+    max_order::Int
     step::Int
-    thread::FastBroadcast.False
 end
 
 """
-    alg_cache(::VCABM, u, rate_prototype, uprev)
+    AdamsCache(alg, u, rate_prototype, starter, order, max_order)
 
-Allocate the work arrays of VCABM for states like `u`.
+Allocate the work arrays of the Adams method `alg` for states like `u`,
+starting at `order`.
 """
-function alg_cache(alg::VCABM, u, rate_prototype, uprev)
-    t = dt = 0.0
-    fsalfirst = zero(rate_prototype)
-    k4 = zero(rate_prototype)
-    dts = fill(zero(dt), 13)
-    c = fill(zero(t), 13, 13)
-    g = fill(zero(t), 13)
-    ϕ_n = Vector{typeof(rate_prototype)}(undef, 13)
-    ϕstar_nm1 = Vector{typeof(rate_prototype)}(undef, 13)
-    ϕstar_n = Vector{typeof(rate_prototype)}(undef, 13)
-    ϕ_np1 = Vector{typeof(rate_prototype)}(undef, 14)
-    for i in 1:13
-        ϕ_n[i] = zero(rate_prototype)
-        ϕstar_nm1[i] = zero(rate_prototype)
-        ϕstar_n[i] = zero(rate_prototype)
-    end
-    for i in 1:14
-        ϕ_np1[i] = zero(rate_prototype)
-    end
-    β = fill(zero(t), 13)
-    order = 1
-    max_order = 12
-    tmp = zero(u)
-    ξ = zero(dt)
-    ξ0 = zero(dt)
-    utilde = zero(u)
-    utildem2 = zero(u)
-    utildem1 = zero(u)
-    utildep1 = zero(u)
-    atmp = similar(u, eltype(u))
-    fill!(atmp, false)
-    atmpm1 = similar(u, eltype(u))
-    fill!(atmpm1, false)
-    atmpm2 = similar(u, eltype(u))
-    fill!(atmpm2, false)
-    atmpp1 = similar(u, eltype(u))
-    fill!(atmpp1, false)
-    return VCABMCache(
-        fsalfirst, k4, ϕstar_nm1, dts, c, g, ϕ_n, ϕ_np1, ϕstar_n, β, order,
-        max_order, atmp, tmp, ξ, ξ0, utilde, utildem1, utildem2, utildep1, atmpm1,
-        atmpm2, atmpp1, 1, FastBroadcast.False()
+function AdamsCache(alg::Alg, u, rate_prototype, starter, order, max_order) where {Alg}
+    count = max_order + 1
+    T = eltype(u)
+    return AdamsCache{Alg, typeof(u), typeof(starter), T}(
+        zero(rate_prototype), zero(rate_prototype), starter,
+        [zero(rate_prototype) for _ in 1:count], [zero(rate_prototype) for _ in 1:count],
+        zero(rate_prototype),
+        zeros(T, BLOCK),
+        zero(u),
+        zeros(count), zeros(count), zeros(count, count), zeros(count),
+        0.0, 0.0, order, max_order, 1
     )
 end
 
 """
-    VariableCoefficientCache
+    VCABM3Cache, VCABM4Cache, VCABM5Cache, VCABMCache
 
-The caches of the Adams methods with variable step size. All keep
-`f(uprev)` in `fsalfirst` and `f(u)` in `k4`.
+The caches of the four Adams methods.
 """
-const VariableCoefficientCache = Union{VCABM3Cache, VCABM4Cache, VCABM5Cache, VCABMCache}
+const VCABM3Cache = AdamsCache{VCABM3}
+const VCABM4Cache = AdamsCache{VCABM4}
+const VCABM5Cache = AdamsCache{VCABM5}
+const VCABMCache = AdamsCache{VCABM}
 
 """
-    get_fsalfirstlast(cache::VariableCoefficientCache)
+    FixedOrderCache
+
+The caches of VCABM3, VCABM4 and VCABM5.
+"""
+const FixedOrderCache = Union{VCABM3Cache, VCABM4Cache, VCABM5Cache}
+
+"""
+    alg_cache(alg, u, rate_prototype, uprev)
+
+Allocate the work arrays of the Adams method `alg` for states like `u`.
+VCABM3 starts with BS3 steps, VCABM4 and VCABM5 with RK4 steps; VCABM starts
+at order 1 and may rise to 12.
+"""
+alg_cache(alg::VCABM3, u, rate_prototype, uprev) =
+    AdamsCache(alg, u, rate_prototype, alg_cache(BS3(), u, rate_prototype, uprev), 3, 3)
+alg_cache(alg::VCABM4, u, rate_prototype, uprev) =
+    AdamsCache(alg, u, rate_prototype, alg_cache(RK4(), u, rate_prototype, uprev), 4, 4)
+alg_cache(alg::VCABM5, u, rate_prototype, uprev) =
+    AdamsCache(alg, u, rate_prototype, alg_cache(RK4(), u, rate_prototype, uprev), 5, 5)
+alg_cache(alg::VCABM, u, rate_prototype, uprev) =
+    AdamsCache(alg, u, rate_prototype, nothing, 1, 12)
+
+"""
+    get_fsalfirstlast(cache::AdamsCache)
 
 The arrays that hold `f(uprev)` and `f(u)`: `fsalfirst` and `k4`.
 """
-get_fsalfirstlast(cache::VariableCoefficientCache) = (cache.fsalfirst, cache.k4)
+get_fsalfirstlast(cache::AdamsCache) = (cache.fsalfirst, cache.k4)
 
 """
-    exchange_fsal!(integrator, cache::VariableCoefficientCache)
+    exchange_fsal!(integrator, cache::AdamsCache)
 
 Exchange `fsalfirst` and `k4`, the arrays that hold `f(uprev)` and `f(u)`.
 """
-function exchange_fsal!(integrator, cache::VariableCoefficientCache)
+function exchange_fsal!(integrator, cache::AdamsCache)
     cache.fsalfirst, cache.k4 = cache.k4, cache.fsalfirst
     integrator.fsalfirst = integrator.k[1] = cache.fsalfirst
     integrator.fsallast = integrator.k[2] = cache.k4

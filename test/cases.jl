@@ -163,7 +163,8 @@ named tuple:
 - `every_step`: the case saves after every step, so its saved times depend on
   the step sizes;
 - `distance`: the largest difference at common saved times, in units of the
-  tolerance (see `tolerance_distance`), and `common`, their number;
+  tolerance (see `tolerance_distance`), `common`, their number, and `bound`,
+  the largest distance the problem allows;
 - `steps`, `reference_steps`: attempted steps of each;
 - `rejections`: OrdinaryDiffEq's number of rejected steps.
 """
@@ -179,6 +180,7 @@ function agreement(case)
         same_times = isequal(lean.t, reference.t),
         every_step = saves_every_step(case.keywords),
         distance, common,
+        bound = get(case.problem, :adaptive_bound, 10),
         steps = lean.stats.naccept + lean.stats.nreject,
         reference_steps = reference.stats.naccept + reference.stats.nreject,
         rejections = reference.stats.nreject,

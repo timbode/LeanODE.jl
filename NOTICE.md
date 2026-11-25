@@ -3,16 +3,14 @@
 LeanODE's methods are taken from OrdinaryDiffEq.jl and its base packages.
 Each entry names the source file and the version it was taken from. Their
 licences are in `LICENSE.md`. The step loop, the step-size control and the
-saving are copied. In Tsit5, RK4 and BS3 the coefficients and formulas are
-OrdinaryDiffEq's and the loops over the state are LeanODE's own
-(`src/kernels.jl`, `src/hermite.jl`); the Adams methods are copied.
+saving are copied. In the methods themselves, the coefficients and formulas
+are OrdinaryDiffEq's and the loops over the state are LeanODE's own
+(`src/kernels.jl`, `src/hermite.jl`, `src/adams_utils.jl`).
 
 | LeanODE file | Copied from |
 |---|---|
-| `src/vendor/MuladdMacro.jl` | MuladdMacro.jl 0.2.7, `src/MuladdMacro.jl` |
 | `src/vendor/FastPower.jl` | FastPower.jl 1.5.1, `src/FastPower.jl` |
-| `src/vendor/FastBroadcast.jl` | FastBroadcast.jl 1.5.1, `src/FastBroadcast.jl`, `ext/FastBroadcastStaticExt.jl`; `indices_do_not_alias` from ArrayInterface.jl 7.30.2 |
-| `src/defaults.jl` | DiffEqBase.jl 6.218.0, `src/common_defaults.jl`, `src/calculate_residuals.jl`, `src/utils.jl` |
+| `src/defaults.jl` | DiffEqBase.jl 6.218.0, `src/common_defaults.jl`, `src/utils.jl` |
 | `src/kernels.jl` | the error scaling of DiffEqBase.jl 6.218.0, `src/calculate_residuals.jl` |
 | `src/misc_utils.jl` | OrdinaryDiffEqCore.jl 3.33.1, `src/misc_utils.jl`; RecursiveArrayTools.jl 3.54.0, `src/utils.jl` |
 | `src/integrator.jl` | OrdinaryDiffEqCore.jl 3.33.1, `src/integrators/type.jl` (reduced) |

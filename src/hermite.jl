@@ -97,7 +97,7 @@ end
 The caches of the methods without an interpolant of their own. For these,
 OrdinaryDiffEq interpolates between steps with the cubic Hermite polynomial.
 """
-const HermiteCache = Union{RK4Cache, BS3Cache, VariableCoefficientCache}
+const HermiteCache = Union{RK4Cache, BS3Cache, AdamsCache}
 
 """
     interpolant!(out, Θ, dt, y₀, y₁, k, cache::HermiteCache)

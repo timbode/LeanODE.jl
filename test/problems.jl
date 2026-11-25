@@ -1,6 +1,8 @@
 # Textbook test problems. Each is a named tuple with the right-hand side `f!`,
 # the initial state `u0`, the time span, the parameters `p`, and `fixed_dt`, a
-# step size at which both methods are stable without step-size control.
+# step size at which the methods are stable without step-size control.
+# `adaptive_bound`, where given, replaces the default bound on the difference
+# between adaptive solves (see test_agreement.jl).
 
 """Exponential decay `u' = -λu`: the trivial case."""
 function decay!(du, u, λ, t)
@@ -72,7 +74,7 @@ const PROBLEMS = (
     decay_backwards = (f! = decay!, u0 = [1.0, 2.0], tspan = (1.0, -1.0), p = 1.5, fixed_dt = 0.05),
     lorenz = (f! = lorenz!, u0 = [1.0, 0.0, 0.0], tspan = (0.0, 5.0), p = (10.0, 28.0, 8 / 3), fixed_dt = 0.005),
     van_der_pol = (f! = van_der_pol!, u0 = [2.0, 0.0], tspan = (0.0, 20.0), p = 1.0, fixed_dt = 0.02),
-    van_der_pol_stiff = (f! = van_der_pol!, u0 = [2.0, 0.0], tspan = (0.0, 20.0), p = 20.0, fixed_dt = 0.002),
+    van_der_pol_stiff = (f! = van_der_pol!, u0 = [2.0, 0.0], tspan = (0.0, 20.0), p = 20.0, fixed_dt = 0.002, adaptive_bound = 100),
     diffusion = (f! = diffusion!, u0 = grid_u0, tspan = (0.0, 0.05), p = (1.0, 1 / 9), fixed_dt = 0.001),
     rotation = (f! = rotation!, u0 = ComplexF64[1, 0.5im, -0.3 + 0.4im], tspan = (0.0, 3.0), p = 2π, fixed_dt = 0.01),
     reaction_diffusion = (f! = reaction_diffusion!, u0 = [sin(0.37i) for i in 1:37], tspan = (0.0, 3.0), p = 0.8, fixed_dt = 0.05),

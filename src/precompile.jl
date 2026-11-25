@@ -18,7 +18,7 @@ end
 
 # `jl_generating_output` is 1 only while Julia writes a package image.
 if ccall(:jl_generating_output, Cint, ()) == 1
-    for alg in (Tsit5(), RK4())
+    for alg in (Tsit5(), RK4(), VCABM())
         solve(ODEProblem(precompile_lorenz!, [1.0, 0.0, 0.0], (0.0, 1.0)), alg)
         solve(ODEProblem(precompile_lorenz!, [1.0, 0.0, 0.0], (0.0, 1.0)), alg; saveat = 0.5, reltol = 1.0e-6, abstol = 1.0e-6)
     end

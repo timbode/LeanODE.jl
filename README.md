@@ -23,7 +23,8 @@ their order.
 For the same problem and options, LeanODE's results agree with OrdinaryDiffEq's
 to rounding error, not bit for bit. LeanODE computes each stage and the error
 estimate in fewer passes over the state, and that changes the order of the
-floating-point operations.
+floating-point operations. The Adams methods keep the operations of every
+component and differ only in the error norm.
 
 - One step from the same state gives the same new state to about `1e-14` of
   its largest component.

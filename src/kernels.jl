@@ -56,6 +56,19 @@ component, relative to the tolerances.
 end
 
 """
+    inverse_scale(u₀, u₁, abstol, reltol)
+
+`1 / (abstol + max(|u₀|, |u₁|) reltol)`: the factor that scales an error of
+one component relative to the tolerances. Several errors of the same
+component then share one division.
+"""
+@inline function inverse_scale(u₀, u₁, abstol, reltol)
+    m₀ = magnitude(u₀)
+    m₁ = magnitude(u₁)
+    return inv(muladd(ifelse(m₁ > m₀, m₁, m₀), reltol, abstol))
+end
+
+"""
     root_mean(total, u)
 
 `sqrt(total / n)` for the sum `total` over the `n` components of `u`; zero

@@ -49,6 +49,10 @@ end
 # the variable-order method chooses its order from error estimates (it rises
 # to order 12 here). Times, orders and rejections must be equal, and states
 # and error estimates within rounding as above (largest seen: 1e-15 and 16).
+# The Adams methods' states are even equal bit for bit, because their sweeps
+# keep upstream's operations per component. The equality matters at high
+# order, where the error estimates of neighbouring orders consist of rounding
+# error only and a different last bit of the state can change the order.
 @testset "the first steps, one at a time" begin
     @testset "$(nameof(typeof(alg)))" for alg in ALGORITHMS
         @testset "$name" for (name, problem) in pairs(PROBLEMS)
@@ -95,7 +99,12 @@ end
 # A case that reaches the end of the time span must also agree within 10
 # tolerances at every saved time the two have in common, save at identical
 # times unless it saves after every step, and attempt about as many steps
-# (on the M4, exactly as many in every case).
+# (on the M4, exactly as many in all but 12 of 1210 cases).
+#
+# The stiff Van der Pol oscillator is allowed 100 tolerances. The step size
+# of an explicit method is there limited by stability, not accuracy, so it
+# oscillates and amplifies rounding differences (largest seen: 9.2
+# tolerances, with VCABM3; the step counts differ by up to 4 in 1800).
 @testset "adaptive steps" begin
     @testset "$(nameof(typeof(alg)))" for alg in ALGORITHMS
         cases = filter(case -> case.alg === alg, comparison_cases())
@@ -103,13 +112,13 @@ end
         @testset "$group" for group in unique(case.group for case in cases)
             for case in filter(case -> case.group == group, cases)
                 result = agreement(case)
-                result.same_retcode && result.retcode_as_expected && (!result.success || result.distance ≤ 10) ||
+                result.same_retcode && result.retcode_as_expected && (!result.success || result.distance ≤ result.bound) ||
                     println("  differs: ", case.label, ": ", result)
                 @test result.same_retcode
                 @test result.retcode_as_expected
                 rejections += result.rejections
                 result.success || continue
-                @test result.distance ≤ 10
+                @test result.distance ≤ result.bound
                 @test result.every_step || result.same_times
                 @test abs(result.steps - result.reference_steps) ≤ 2 + 0.05 * result.reference_steps
             end

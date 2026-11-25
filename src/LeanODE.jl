@@ -1,11 +1,7 @@
 module LeanODE
 
-include("vendor/MuladdMacro.jl")
 include("vendor/FastPower.jl")
-include("vendor/FastBroadcast.jl")
-using .MuladdMacro: @muladd
 using .FastPower: fastpower
-using .FastBroadcast: @..
 
 export ODEProblem, ODESolution, ReturnCode, solve
 export Tsit5, RK4, BS3, VCABM, VCABM3, VCABM4, VCABM5
