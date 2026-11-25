@@ -9,11 +9,13 @@ OrdinaryDiffEqAdamsBashforthMoulton = "89bda076-bce5-4f1c-845f-551c83cdda9a"
 OrdinaryDiffEqCore = "bbf590c4-e513-4bbe-9b18-05decba2e5d8"
 OrdinaryDiffEqLowOrderRK = "1344f307-1e59-4825-a18e-ace9aa3fa4c6"
 OrdinaryDiffEqTsit5 = "b1df2697-797e-41e3-8120-5422d3b24e4a"
+PrecompiledComparison = "40a49816-5504-4e76-a76f-35648eb70f99"
 SciMLBase = "0bca4576-84f4-4d90-8ffe-ffa030f20462"
 Test = "8dfed614-e22c-5e08-85e1-65c5234f0b40"
 
 [sources]
 LeanODE = {path = ".."}
+PrecompiledComparison = {path = "PrecompiledComparison"}
 
 [compat]
 DiffEqBase = "=6.218.0"

@@ -41,6 +41,23 @@ function rotation!(du, u, ω, t)
     return nothing
 end
 
+"""Reaction–diffusion `u_t = κ u_xx - u³` on a line with zero boundary values, by central differences: a vector long enough to fill the vectorised part of every loop and leave a remainder."""
+function reaction_diffusion!(du, u, κ, t)
+    n = length(u)
+    for i in 1:n
+        left = i > 1 ? u[i - 1] : 0.0
+        right = i < n ? u[i + 1] : 0.0
+        du[i] = κ * (left - 2u[i] + right) - u[i]^3
+    end
+    return nothing
+end
+
+"""Blow-up in finite time, `u' = u²`: the solution of `u(0) = 1` is `1 / (1 - t)`, so the step size collapses near `t = 1`."""
+function blowup!(du, u, p, t)
+    @. du = u^2
+    return nothing
+end
+
 """A right-hand side that becomes NaN after `t = t_nan`, to test the `Unstable` return code."""
 function nan_after!(du, u, t_nan, t)
     @. du = t > t_nan ? NaN : -u
@@ -57,4 +74,5 @@ const PROBLEMS = (
     van_der_pol_stiff = (f! = van_der_pol!, u0 = [2.0, 0.0], tspan = (0.0, 20.0), p = 20.0),
     diffusion = (f! = diffusion!, u0 = grid_u0, tspan = (0.0, 0.05), p = (1.0, 1 / 9)),
     rotation = (f! = rotation!, u0 = ComplexF64[1, 0.5im, -0.3 + 0.4im], tspan = (0.0, 3.0), p = 2π),
+    reaction_diffusion = (f! = reaction_diffusion!, u0 = [sin(0.37i) for i in 1:37], tspan = (0.0, 3.0), p = 0.8),
 )
