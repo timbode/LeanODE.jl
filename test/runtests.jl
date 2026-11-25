@@ -7,23 +7,27 @@
 # differently: `muladd(c₂, k₂, c₁ * k₁)` becomes `fma(c₂, k₂, c₁ * k₁)` just in
 # time and `fma(c₁, k₁, c₂ * k₂)` ahead of time (Julia 1.12.7 on an Apple M4).
 # OrdinaryDiffEq precompiles Tsit5 for `Vector{Float64}` states, so in an
-# ordinary session that one case runs ahead-of-time code while everything else,
-# LeanODE included, is compiled just in time.
+# ordinary session its kernels for that case are ahead-of-time code while
+# everything else is compiled just in time. LeanODE precompiles the same
+# (src/precompile.jl).
 #
-# The suite therefore runs twice, each time in a process of its own:
+# The suite therefore runs three times, each time in a process of its own:
 #
 #   "precompiled": the fixture package test/PrecompiledComparison holds every
-#                  comparison compiled ahead of time, for both sides.
+#                  comparison compiled ahead of time, for both sides. A system
+#                  image is like this.
+#   "session":     an ordinary session. Each package brings the code it
+#                  precompiled itself; the rest is compiled just in time.
 #   "jit":         package images are switched off, so both sides are compiled
 #                  just in time.
 #
-# Both processes run with default bounds checking, whatever this one was
+# All processes run with default bounds checking, whatever this one was
 # started with (`Pkg.test` forces bounds checks, which changes the loops).
 
 const MODE = get(ENV, "LEANODE_TEST_MODE", "")
 
 if isempty(MODE)
-    exitcodes = map(("precompiled" => "yes", "jit" => "no")) do (mode, pkgimages)
+    exitcodes = map(("precompiled" => "yes", "session" => "yes", "jit" => "no")) do (mode, pkgimages)
         # Julia lists in this file every method it compiles while the process
         # runs; the precompiled mode checks that the solvers are not among them.
         compiled = tempname()
@@ -62,7 +66,7 @@ const REFERENCE = [
         end
         @test VERSION == v"1.12.7"
         @test Base.JLOptions().check_bounds == 0
-        @test (Base.JLOptions().use_pkgimages != 0) == (MODE == "precompiled")
+        @test (Base.JLOptions().use_pkgimages != 0) == (MODE != "jit")
     end
     if MODE == "precompiled"
         include("test_precompiled.jl")
@@ -71,6 +75,8 @@ const REFERENCE = [
         include("compare.jl")
         include("cases.jl")
         include("test_identical.jl")
+    end
+    if MODE == "jit"
         include("test_behaviour.jl")
         include("test_extension.jl")
     end

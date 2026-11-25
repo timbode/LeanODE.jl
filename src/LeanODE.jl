@@ -21,5 +21,6 @@ include("solve.jl")
 include("tsit5_tableaus.jl")
 include("tsit5.jl")
 include("rk4.jl")
+include("precompile.jl")
 
 end # module LeanODE

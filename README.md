@@ -10,12 +10,12 @@ It has no dependencies outside Julia's standard library.
 The results are identical when both packages are compiled the same way. Julia
 compiles a function either just in time, when it is first called, or ahead of
 time, into a package image or a system image, and the two round some
-multiply-adds differently. The tests compare the packages in both ways:
-everything compiled just in time, and everything compiled ahead of time.
+multiply-adds differently.
 
-In an ordinary session the two are mixed. OrdinaryDiffEq precompiles `Tsit5`
-for `Vector{Float64}` states, while LeanODE's code is compiled just in time,
-so that case can differ in the last bits of the solution. The tolerances are
-met either way.
+In an ordinary session each package runs the code it precompiled and compiles
+the rest just in time. OrdinaryDiffEq precompiles `Tsit5` for
+`Vector{Float64}` states, and LeanODE precompiles the same, so the results are
+identical there as well.
 
-Work in progress.
+The tests compare the packages in all three ways: everything compiled ahead
+of time, an ordinary session, and everything compiled just in time.

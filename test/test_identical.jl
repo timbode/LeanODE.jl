@@ -1,5 +1,7 @@
-# LeanODE and OrdinaryDiffEq, both compiled just in time, must give identical
-# solutions in every case of cases.jl.
+# LeanODE and OrdinaryDiffEq must give identical solutions in every case of
+# cases.jl. The right-hand sides are defined in this process, so each solve is
+# compiled now: entirely just in time in the "jit" mode, and around the
+# kernels the packages precompiled themselves in the "session" mode.
 
 @testset "identical to OrdinaryDiffEq" begin
     @testset "$(nameof(typeof(alg)))" for alg in ALGORITHMS
