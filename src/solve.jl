@@ -59,6 +59,11 @@ function build_options(prob, alg, settings)
     tdir = sign(tspan[end] - tspan[1])
     u = prob.u0
 
+    for (name, tolerance) in (("abstol", abstol), ("reltol", reltol))
+        tolerance === nothing || tolerance isa Number || throw(
+            ArgumentError("$name must be a number, got a $(typeof(tolerance)); a tolerance per component is not supported")
+        )
+    end
     abstol_internal = abstol === nothing ? default_tolerance(u, 1 // 10^6) : real.(abstol)
     reltol_internal = reltol === nothing ? default_tolerance(u, 1 // 10^3) : real.(reltol)
     dtmax > zero(dtmax) && tdir < 0 && (dtmax *= tdir) # Allow positive dtmax, but auto-convert
@@ -469,7 +474,8 @@ end
 Integrate `prob` with the method `alg` (`Tsit5()` or `RK4()`) and return an
 [`ODESolution`](@ref). The keywords and their defaults are OrdinaryDiffEq's:
 
-- `abstol = 1e-6`, `reltol = 1e-3`: absolute and relative tolerance.
+- `abstol = 1e-6`, `reltol = 1e-3`: absolute and relative tolerance, one
+  number each for all components.
 - `saveat = ()`: times to save at, or a number meaning every `saveat` time
   units. States between steps come from the method's interpolant.
 - `save_everystep = isempty(saveat)`: also save the state after every step.
@@ -484,6 +490,10 @@ Integrate `prob` with the method `alg` (`Tsit5()` or `RK4()`) and return an
 The solve stops early with a return code other than `ReturnCode.Success`
 when the step size becomes NaN or too small, the state becomes infinite or
 NaN, or `maxiters` is exceeded.
+
+# Throws
+- `ArgumentError` if `adaptive = false` and no `dt` is given, or if a
+  tolerance is not a number.
 """
 function solve(
         prob::ODEProblem, alg::LeanAlgorithm;

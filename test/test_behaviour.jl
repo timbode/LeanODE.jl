@@ -32,6 +32,12 @@
         @test_throws ArgumentError LeanODE.ODEProblem(decay!, Float32[1, 2], (0.0, 1.0), 1.0)
     end
 
+    @testset "a tolerance per component is refused" begin
+        problem = LeanODE.ODEProblem(decay!, [1.0, 2.0], (0.0, 1.0), 1.0)
+        @test_throws ArgumentError LeanODE.solve(problem, LeanODE.Tsit5(); abstol = [1.0e-6, 1.0e-8])
+        @test_throws ArgumentError LeanODE.solve(problem, LeanODE.Tsit5(); reltol = [1.0e-6, 1.0e-8])
+    end
+
     @testset "fixed steps need dt" begin
         problem = LeanODE.ODEProblem(decay!, [1.0], (0.0, 1.0), 1.0)
         @test_throws ArgumentError LeanODE.solve(problem, LeanODE.RK4(); adaptive = false)
