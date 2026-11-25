@@ -183,11 +183,11 @@ Make the accepted step the starting point of the next: `u` becomes `uprev`
 and `f(u)` becomes `f(uprev)` (first same as last), and the proposed step
 size is taken.
 
-OrdinaryDiffEq copies `u` into `uprev` and `fsallast` into `fsalfirst`. Here
-the arrays are exchanged instead, which saves two passes over the state per
-step and changes no value that is read afterwards: the next step overwrites
-`u` and `fsallast` before reading them. Until then `state_in_uprev` marks
-`u` as outdated.
+OrdinaryDiffEq copies `u` into `uprev` and `fsallast` into `fsalfirst`.
+LeanODE exchanges the arrays instead, which saves two passes over the state
+per step and changes no value that is read afterwards: the next step
+overwrites `u` and `fsallast` before reading them. Until then
+`state_in_uprev` marks `u` as outdated.
 """
 function apply_step!(integrator)
     exchange_state!(integrator)
