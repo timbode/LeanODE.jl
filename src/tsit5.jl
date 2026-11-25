@@ -1,9 +1,8 @@
-# Copied from OrdinaryDiffEqTsit5 1.12.0 (src/tsit_caches.jl, src/tsit_perform_step.jl,
+# After OrdinaryDiffEqTsit5 1.12.0 (src/tsit_caches.jl, src/tsit_perform_step.jl,
 # src/interpolants.jl), MIT licence; see LICENSE.md. Only the in-place method
-# for `Array` states is kept, without stage and step limiters. The broadcasts
-# stay FastBroadcast's `@..` (vendored): Julia lowers `muladd` to contractable
-# multiply and add, and whether the backend fuses them depends on the loop it
-# sits in, so Base's `@.` would change the last bits.
+# for `Array` states is kept, without stage and step limiters. The method and
+# its coefficients are OrdinaryDiffEq's; the loops over the state are
+# LeanODE's own (kernels.jl).
 
 """
     Tsit5()
@@ -25,10 +24,9 @@ alg_order(::Tsit5) = 5
 """
     Tsit5Cache
 
-Work arrays of Tsit5: the stage derivatives `k1`–`k7`, the error estimate
-`utilde`, a stage state `tmp`, and the scaled error `atmp`. `thread` selects
-FastBroadcast's serial kernel. The struct is mutable because `k1` and `k7`
-change places after every accepted step (see `exchange_fsal!`).
+Work arrays of Tsit5: the stage derivatives `k1`–`k7` and a stage state
+`tmp`. The struct is mutable because `k1` and `k7` change places after every
+accepted step (see `exchange_fsal!`).
 """
 mutable struct Tsit5Cache{uType}
     k1::uType
@@ -38,10 +36,7 @@ mutable struct Tsit5Cache{uType}
     k5::uType
     k6::uType
     k7::uType
-    utilde::uType
     tmp::uType
-    atmp::uType
-    thread::FastBroadcast.False
 end
 
 """
@@ -58,11 +53,8 @@ function alg_cache(::Tsit5, u, rate_prototype, uprev)
     k5 = zero(rate_prototype)
     k6 = zero(rate_prototype)
     k7 = zero(rate_prototype)
-    utilde = zero(u)
-    atmp = similar(u, eltype(u))
-    fill!(atmp, false)
     tmp = zero(u)
-    return Tsit5Cache(k1, k2, k3, k4, k5, k6, k7, utilde, tmp, atmp, FastBroadcast.False())
+    return Tsit5Cache(k1, k2, k3, k4, k5, k6, k7, tmp)
 end
 
 """
@@ -113,48 +105,33 @@ end
 Take one step from `(t, uprev)` with step size `dt`, writing the new state
 into `u`, the stages into the cache, and (if adaptive) the scaled error
 estimate into `integrator.EEst`.
+
+Stage `s` evaluates `f` at `uprev + dt Σⱼ aₛⱼ kⱼ`; the new state is the
+seventh of these, and the error estimate is `dt Σⱼ b̃ⱼ kⱼ`.
 """
-@muladd function perform_step!(integrator, cache::Tsit5Cache)
+function perform_step!(integrator, cache::Tsit5Cache)
     (; t, dt, uprev, u, f, p) = integrator
-    T = constvalue(recursive_unitless_bottom_eltype(u))
-    T2 = constvalue(typeof(one(t)))
-    @OnDemandTableauExtract Tsit5ConstantCacheActual T T2
-    (; k1, k2, k3, k4, k5, k6, k7, utilde, tmp, atmp, thread) = cache
-    a = dt * a21
-    @.. broadcast = false thread = thread tmp = uprev + a * k1
+    @OnDemandTableauExtract Tsit5ConstantCacheActual Float64 Float64
+    (; k1, k2, k3, k4, k5, k6, k7, tmp) = cache
+    combine!(tmp, uprev, dt * a21, k1)
     f(k2, tmp, p, t + c1 * dt)
-    @.. broadcast = false thread = thread tmp = uprev + dt * (a31 * k1 + a32 * k2)
+    combine!(tmp, uprev, dt * a31, k1, dt * a32, k2)
     f(k3, tmp, p, t + c2 * dt)
-    @.. broadcast = false thread = thread tmp = uprev + dt * (a41 * k1 + a42 * k2 + a43 * k3)
+    combine!(tmp, uprev, dt * a41, k1, dt * a42, k2, dt * a43, k3)
     f(k4, tmp, p, t + c3 * dt)
-    @.. broadcast = false thread = thread tmp = uprev +
-        dt * (a51 * k1 + a52 * k2 + a53 * k3 + a54 * k4)
+    combine!(tmp, uprev, dt * a51, k1, dt * a52, k2, dt * a53, k3, dt * a54, k4)
     f(k5, tmp, p, t + c4 * dt)
-    @.. broadcast = false thread = thread tmp = uprev +
-        dt * (
-        a61 * k1 + a62 * k2 + a63 * k3 + a64 * k4 +
-            a65 * k5
-    )
+    combine!(tmp, uprev, dt * a61, k1, dt * a62, k2, dt * a63, k3, dt * a64, k4, dt * a65, k5)
     f(k6, tmp, p, t + dt)
-    @.. broadcast = false thread = thread u = uprev +
-        dt * (
-        a71 * k1 + a72 * k2 + a73 * k3 + a74 * k4 +
-            a75 * k5 + a76 * k6
-    )
+    combine!(u, uprev, dt * a71, k1, dt * a72, k2, dt * a73, k3, dt * a74, k4, dt * a75, k5, dt * a76, k6)
     f(k7, u, p, t + dt)
     integrator.stats.nf += 6
     if integrator.opts.adaptive
-        @.. broadcast = false thread = thread utilde = dt * (
-            btilde1 * k1 + btilde2 * k2 +
-                btilde3 * k3 + btilde4 * k4 +
-                btilde5 * k5 + btilde6 * k6 +
-                btilde7 * k7
+        integrator.EEst = error_norm(
+            uprev, u, integrator.opts.abstol, integrator.opts.reltol,
+            dt * btilde1, k1, dt * btilde2, k2, dt * btilde3, k3, dt * btilde4, k4,
+            dt * btilde5, k5, dt * btilde6, k6, dt * btilde7, k7
         )
-        calculate_residuals!(
-            atmp, utilde, uprev, u, integrator.opts.abstol,
-            integrator.opts.reltol, ode_default_norm, t
-        )
-        integrator.EEst = ode_default_norm(atmp, t)
     end
     return nothing
 end
@@ -166,11 +143,8 @@ Write into `out` the state at `tprev + Θ dt` within the last step, from
 `y₀ = uprev`, `y₁ = u` and the stages `k`. For Tsit5 this is Tsitouras' free
 fourth-order interpolant, `y₀ + dt Σᵢ bᵢ(Θ) kᵢ`. Returns `out`.
 """
-@muladd function interpolant!(
-        out::Array, Θ, dt, y₀, y₁, k, cache::Tsit5Cache
-    )
-    var"#T#" = constvalue(recursive_unitless_bottom_eltype(y₁))
-    r11, r12, r13, r14, r22, r23, r24, r32, r33, r34, r42, r43, r44, r52, r53, r54, r62, r63, r64, r72, r73, r74 = Tsit5Interp(var"#T#")
+function interpolant!(out::Array, Θ, dt, y₀, y₁, k, cache::Tsit5Cache)
+    r11, r12, r13, r14, r22, r23, r24, r32, r33, r34, r42, r43, r44, r52, r53, r54, r62, r63, r64, r72, r73, r74 = Tsit5Interp(Float64)
     Θ² = Θ * Θ
     b1Θ = Θ * @evalpoly(Θ, r11, r12, r13, r14)
     b2Θ = Θ² * @evalpoly(Θ, r22, r23, r24)
@@ -179,12 +153,9 @@ fourth-order interpolant, `y₀ + dt Σᵢ bᵢ(Θ) kᵢ`. Returns `out`.
     b5Θ = Θ² * @evalpoly(Θ, r52, r53, r54)
     b6Θ = Θ² * @evalpoly(Θ, r62, r63, r64)
     b7Θ = Θ² * @evalpoly(Θ, r72, r73, r74)
-    @inbounds @simd ivdep for i in eachindex(out)
-        out[i] = y₀[i] +
-            dt * (
-            k[1][i] * b1Θ + k[2][i] * b2Θ + k[3][i] * b3Θ + k[4][i] * b4Θ +
-                k[5][i] * b5Θ + k[6][i] * b6Θ + k[7][i] * b7Θ
-        )
-    end
+    combine!(
+        out, y₀, dt * b1Θ, k[1], dt * b2Θ, k[2], dt * b3Θ, k[3], dt * b4Θ, k[4],
+        dt * b5Θ, k[5], dt * b6Θ, k[6], dt * b7Θ, k[7]
+    )
     return out
 end

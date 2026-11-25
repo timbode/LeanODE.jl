@@ -91,10 +91,40 @@ function build_options(prob, alg, settings)
 end
 
 """
+    init(prob, alg; kwargs...)
+
+The integrator for solving `prob` with the method `alg`, ready for its first
+step. The keywords and their defaults are those of [`solve`](@ref), which is
+`solve!` applied to this integrator.
+"""
+function init(
+        prob::ODEProblem, alg::LeanAlgorithm;
+        saveat = (),
+        save_everystep = isempty(saveat),
+        save_start = save_everystep || isempty(saveat) ||
+            saveat isa Number || prob.tspan[1] in saveat,
+        save_end = nothing,
+        dt = nothing,
+        dtmin = eltype(prob.tspan)(0),
+        dtmax = eltype(prob.tspan)((prob.tspan[end] - prob.tspan[1])),
+        adaptive = true,
+        abstol = nothing,
+        reltol = nothing,
+        maxiters = 1000000
+    )
+    settings = (;
+        saveat, save_everystep, save_start, save_end, dt, dtmin, dtmax,
+        adaptive, abstol, reltol, maxiters,
+    )
+    return init(prob, alg, settings)
+end
+
+"""
     init(prob, alg, settings)
 
-Set up the integrator: copy the initial state, build the method's cache, save
-the initial state if asked, evaluate `f(u0)` and choose the initial step size.
+Set up the integrator from the keyword arguments collected in the named tuple
+`settings`: copy the initial state, build the method's cache, save the
+initial state if asked, evaluate `f(u0)` and choose the initial step size.
 """
 function init(prob::ODEProblem, alg::LeanAlgorithm, settings)
     (; dt, adaptive) = settings
@@ -526,27 +556,8 @@ NaN, or `maxiters` is exceeded.
 - `ArgumentError` if `adaptive = false` and no `dt` is given, or if a
   tolerance is not a number.
 """
-function solve(
-        prob::ODEProblem, alg::LeanAlgorithm;
-        saveat = (),
-        save_everystep = isempty(saveat),
-        save_start = save_everystep || isempty(saveat) ||
-            saveat isa Number || prob.tspan[1] in saveat,
-        save_end = nothing,
-        dt = nothing,
-        dtmin = eltype(prob.tspan)(0),
-        dtmax = eltype(prob.tspan)((prob.tspan[end] - prob.tspan[1])),
-        adaptive = true,
-        abstol = nothing,
-        reltol = nothing,
-        maxiters = 1000000
-    )
-    settings = (;
-        saveat, save_everystep, save_start, save_end, dt, dtmin, dtmax,
-        adaptive, abstol, reltol, maxiters,
-    )
-    integrator = init(prob, alg, settings)
-    solve!(integrator)
+function solve(prob::ODEProblem, alg::LeanAlgorithm; kwargs...)
+    integrator = solve!(init(prob, alg; kwargs...))
     return ODESolution(
         integrator.ts, integrator.us, integrator.retcode, integrator.stats, prob, alg
     )

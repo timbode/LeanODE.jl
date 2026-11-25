@@ -1,9 +1,9 @@
 # LeanODE
 
-LeanODE solves ordinary differential equations with methods copied from
-[OrdinaryDiffEq.jl](https://github.com/SciML/OrdinaryDiffEq.jl). For the same
-problem and options, it returns the same results as OrdinaryDiffEq, bit for bit.
-It has no dependencies outside Julia's standard library.
+LeanODE solves ordinary differential equations with methods taken from
+[OrdinaryDiffEq.jl](https://github.com/SciML/OrdinaryDiffEq.jl): the same
+coefficients, error estimates and step-size control. It has no dependencies
+outside Julia's standard library.
 
 ## Methods
 
@@ -18,17 +18,21 @@ It has no dependencies outside Julia's standard library.
 The Adams methods evaluate the right-hand side twice per step, whatever
 their order.
 
-## Identical results and compilation
+## Agreement with OrdinaryDiffEq
 
-The results are identical when both packages are compiled the same way. Julia
-compiles a function either just in time, when it is first called, or ahead of
-time, into a package image or a system image, and the two round some
-multiply-adds differently.
+For the same problem and options, LeanODE's results agree with OrdinaryDiffEq's
+to rounding error, not bit for bit. LeanODE computes each stage and the error
+estimate in fewer passes over the state, and that changes the order of the
+floating-point operations.
 
-In an ordinary session each package runs the code it precompiled and compiles
-the rest just in time. OrdinaryDiffEq precompiles `Tsit5` for
-`Vector{Float64}` states, and LeanODE precompiles the same, so the results are
-identical there as well.
+- One step from the same state gives the same new state to about `1e-14` of
+  its largest component.
+- With a fixed step size both packages take the same steps, and the solutions
+  differ by accumulated rounding error.
+- With step-size control, rounding differences in the error estimate change
+  the step sizes slightly. The two solutions then differ by a fraction of the
+  tolerance. In a chaotic system this difference grows with time, like any
+  other perturbation.
 
-The tests compare the packages in all three ways: everything compiled ahead
-of time, an ordinary session, and everything compiled just in time.
+The tests bound all three against OrdinaryDiffEq at the versions pinned in
+`test/Project.toml`.

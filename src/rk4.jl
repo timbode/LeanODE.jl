@@ -1,7 +1,8 @@
-# Copied from OrdinaryDiffEqLowOrderRK 1.13.0 (src/low_order_rk_caches.jl,
+# After OrdinaryDiffEqLowOrderRK 1.13.0 (src/low_order_rk_caches.jl,
 # src/fixed_timestep_perform_step.jl), MIT licence; see LICENSE.md. Only the
-# in-place method for `Array` states is kept, without stage and step limiters;
-# the broadcasts stay `@..`, as in tsit5.jl.
+# in-place method for `Array` states is kept, without stage and step limiters.
+# The method and its error estimate are OrdinaryDiffEq's; the loops over the
+# state are LeanODE's own (kernels.jl, hermite.jl).
 
 """
     RK4()
@@ -25,8 +26,7 @@ alg_order(::RK4) = 4
     RK4Cache
 
 Work arrays of RK4: the stage derivatives `fsalfirst` (`k₁`), `k₂`, `k₃`,
-`k₄` and `k` (`f` at the new state), a stage state `tmp`, and the scaled
-error `atmp`. `thread` selects FastBroadcast's serial kernel. The struct is
+`k₄` and `k` (`f` at the new state), and a stage state `tmp`. The struct is
 mutable because `fsalfirst` and `k` change places after every accepted step
 (see `exchange_fsal!`).
 """
@@ -37,8 +37,6 @@ mutable struct RK4Cache{uType}
     k₄::uType
     k::uType
     tmp::uType
-    atmp::uType
-    thread::FastBroadcast.False
 end
 
 """
@@ -53,9 +51,7 @@ function alg_cache(::RK4, u, rate_prototype, uprev)
     k₄ = zero(rate_prototype)
     k = zero(rate_prototype)
     tmp = zero(u)
-    atmp = similar(u, eltype(u))
-    fill!(atmp, false)
-    return RK4Cache(k₁, k₂, k₃, k₄, k, tmp, atmp, FastBroadcast.False())
+    return RK4Cache(k₁, k₂, k₃, k₄, k, tmp)
 end
 
 """
@@ -97,86 +93,58 @@ end
 """
     perform_step!(integrator, cache::RK4Cache)
 
-Take one RK4 step from `(t, uprev)` with step size `dt` into `u`. If adaptive,
-estimate the error from the defect of the Hermite interpolant at the interior
-points `σ₁,₂ = 1/2 ∓ √3/6` and store it, scaled by 2.1342, in
-`integrator.EEst`.
+Take one RK4 step from `(t, uprev)` with step size `dt` into `u`, and
+evaluate `f(u)` into `cache.k`. If adaptive, store the error estimate in
+`integrator.EEst` (see `residual_estimate!`).
 """
-@muladd function perform_step!(integrator, cache::RK4Cache)
+function perform_step!(integrator, cache::RK4Cache)
     (; t, dt, uprev, u, f, p) = integrator
-    (; tmp, fsalfirst, k₂, k₃, k₄, k, atmp, thread) = cache
+    (; tmp, fsalfirst, k₂, k₃, k₄, k) = cache
     k₁ = fsalfirst
     halfdt = dt / 2
-    ttmp = t + halfdt
-    @.. broadcast = false thread = thread tmp = uprev + halfdt * k₁
-    f(k₂, tmp, p, ttmp)
-    @.. broadcast = false thread = thread tmp = uprev + halfdt * k₂
-    f(k₃, tmp, p, ttmp)
-    @.. broadcast = false thread = thread tmp = uprev + dt * k₃
+    combine!(tmp, uprev, halfdt, k₁)
+    f(k₂, tmp, p, t + halfdt)
+    combine!(tmp, uprev, halfdt, k₂)
+    f(k₃, tmp, p, t + halfdt)
+    combine!(tmp, uprev, dt, k₃)
     f(k₄, tmp, p, t + dt)
-    @.. broadcast = false thread = thread u = uprev + (dt / 6) * (2 * (k₂ + k₃) + (k₁ + k₄))
+    combine!(u, uprev, dt / 6, k₁, dt / 3, k₂, dt / 3, k₃, dt / 6, k₄)
     f(k, u, p, t + dt)
     integrator.stats.nf += 4
     if integrator.opts.adaptive
-        # Shampine Solving ODEs and DDEs with Residual Control Estimate
-        k₅ = k
-        _p = k₂
-        pprime = k₃ # Alias some cache arrays
-        # one(t) so that types are correct but unitless
-        σ₁ = one(t) * (1 // 2) - sqrt(one(t) * 3) / 6
-        σ₂ = one(t) * (1 // 2) + sqrt(one(t) * 3) / 6
-        @.. broadcast = false thread = thread tmp = (1 - σ₁) * uprev + σ₁ * u +
-            σ₁ * (σ₁ - 1) *
-            (
-            (1 - 2σ₁) * (u - uprev) +
-                (σ₁ - 1) * dt * k₁ +
-                σ₁ * dt * k₅
-        )
-        @.. broadcast = false thread = thread pprime = k₁ +
-            σ₁ *
-            (
-            -4 * dt * k₁ - 2 * dt * k₅ - 6 * uprev +
-                σ₁ *
-                (
-                3 * dt * k₁ + 3 * dt * k₅ + 6 * uprev -
-                    6 * u
-            ) +
-                6 * u
-        ) / dt
-        f(_p, tmp, p, t + σ₁ * dt)
-        @.. broadcast = false thread = thread tmp = dt * (_p - pprime)
-        calculate_residuals!(
-            atmp, tmp, uprev, u, integrator.opts.abstol,
-            integrator.opts.reltol, ode_default_norm, t
-        )
-        e1 = ode_default_norm(atmp, t)
-        @.. broadcast = false thread = thread tmp = (1 - σ₂) * uprev + σ₂ * u +
-            σ₂ * (σ₂ - 1) *
-            (
-            (1 - 2σ₂) * (u - uprev) +
-                (σ₂ - 1) * dt * k₁ +
-                σ₂ * dt * k₅
-        )
-        @.. broadcast = false thread = thread pprime = k₁ +
-            σ₂ *
-            (
-            -4 * dt * k₁ - 2 * dt * k₅ - 6 * uprev +
-                σ₂ *
-                (
-                3 * dt * k₁ + 3 * dt * k₅ + 6 * uprev -
-                    6 * u
-            ) +
-                6 * u
-        ) / dt
-        f(_p, tmp, p, t + σ₂ * dt)
-        @.. broadcast = false thread = thread tmp = dt * (_p - pprime)
-        calculate_residuals!(
-            atmp, tmp, uprev, u, integrator.opts.abstol,
-            integrator.opts.reltol, ode_default_norm, t
-        )
-        e2 = ode_default_norm(atmp, t)
-        integrator.EEst = convert(typeof(one(t)), 2.1342) * max(e1, e2)
+        integrator.EEst = residual_estimate!(integrator, cache)
         integrator.stats.nf += 2
     end
     return nothing
+end
+
+"""
+    RESIDUAL_NODES
+
+The two positions within a step, `1/2 ∓ √3/6`, at which RK4 measures the
+residual of the Hermite interpolant.
+"""
+const RESIDUAL_NODES = (1 / 2 - sqrt(3) / 6, 1 / 2 + sqrt(3) / 6)
+
+"""
+    residual_estimate!(integrator, cache::RK4Cache)
+
+The scaled error estimate of the RK4 step just taken (Shampine, 2005): 2.1342
+times the larger of the two residual norms of the cubic Hermite interpolant at
+`RESIDUAL_NODES`. Evaluates `f` twice and overwrites the stage arrays `tmp`,
+`k₂`, `k₃` and `k₄`, which the step no longer needs.
+"""
+function residual_estimate!(integrator, cache::RK4Cache)
+    (; t, dt, uprev, u, f, p) = integrator
+    (; abstol, reltol) = integrator.opts
+    slope₀, slope₁ = cache.fsalfirst, cache.k # f(uprev) and f(u)
+    state₁, state₂, f₁, f₂ = cache.tmp, cache.k₄, cache.k₂, cache.k₃
+    σ₁, σ₂ = RESIDUAL_NODES
+    hermite_pair!(state₁, state₂, σ₁, σ₂, dt, uprev, u, slope₀, slope₁)
+    f(f₁, state₁, p, t + σ₁ * dt)
+    f(f₂, state₂, p, t + σ₂ * dt)
+    e₁, e₂ = hermite_residual_norms(
+        σ₁, σ₂, dt, uprev, u, slope₀, slope₁, f₁, f₂, abstol, reltol
+    )
+    return 2.1342 * max(e₁, e₂)
 end

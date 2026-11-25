@@ -13,6 +13,7 @@ export Tsit5, RK4, BS3, VCABM, VCABM3, VCABM4, VCABM5
 include("types.jl")
 include("misc_utils.jl")
 include("defaults.jl")
+include("kernels.jl")
 include("integrator.jl")
 include("initdt.jl")
 include("controller.jl")

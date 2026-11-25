@@ -35,7 +35,7 @@ Hairer's starting-step algorithm for an in-place right-hand side `f`, as in
 OrdinaryDiffEqCore's function of the same name. `order` is the order of the
 method. Returns the step size multiplied by `tdir`.
 """
-@muladd function _ode_initdt_iip(
+function _ode_initdt_iip(
         u0, t, tdir, dtmax, abstol, reltol, internalnorm,
         f, p, order, integrator
     )
@@ -48,7 +48,7 @@ method. Returns the step size multiplied by `tdir`.
 
     sk = integrator.cache.tmp
     @inbounds @simd ivdep for i in eachindex(u0)
-        sk[i] = abstol + internalnorm(u0[i], t) * reltol
+        sk[i] = muladd(internalnorm(u0[i], t), reltol, abstol)
     end
 
     f₀ = integrator.fsallast
@@ -95,7 +95,7 @@ method. Returns the step size multiplied by `tdir`.
 
     u₁ = zero(u0)
     @inbounds @simd ivdep for i in eachindex(u0)
-        u₁[i] = u0[i] + dt₀_tdir * f₀[i]
+        u₁[i] = muladd(dt₀_tdir, f₀[i], u0[i])
     end
     f₁ = zero(f₀)
     f(f₁, u₁, p, t + dt₀_tdir)
