@@ -4,4 +4,11 @@ version = "0.1.0"
 authors = ["Tim Bode"]
 
 [compat]
+SciMLBase = "2"
 julia = "1.11"
+
+[weakdeps]
+SciMLBase = "0bca4576-84f4-4d90-8ffe-ffa030f20462"
+
+[extensions]
+LeanODESciMLBaseExt = "SciMLBase"

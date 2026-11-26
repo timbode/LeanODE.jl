@@ -2,7 +2,7 @@
 
 julia_version = "1.12.7"
 manifest_format = "2.0"
-project_hash = "02165ceb1f77acff275bafeefba21704dc57a7e3"
+project_hash = "0225221d97498e70e40b41685bc7e4a9e59c8e13"
 
 [[deps.ADTypes]]
 deps = ["PrecompileTools"]
@@ -472,6 +472,10 @@ version = "0.1.17"
 path = ".."
 uuid = "c86d6785-5fd8-4c08-817e-7d1d1bc4b9b4"
 version = "0.1.0"
+weakdeps = ["SciMLBase"]
+
+    [deps.LeanODE.extensions]
+    LeanODESciMLBaseExt = "SciMLBase"
 
 [[deps.Libdl]]
 uuid = "8f399da3-3557-5675-b5ff-fb832c97cbdb"
@@ -654,6 +658,12 @@ deps = ["Preferences"]
 git-tree-sha1 = "1e697ad6f68af89cd3651bbe9b4a7b5d800adf5a"
 uuid = "aea7be01-6a6a-4083-8856-8a6e6704d82a"
 version = "1.4.0"
+
+[[deps.PrecompiledComparison]]
+deps = ["LeanODE", "Logging", "OrdinaryDiffEqAdamsBashforthMoulton", "OrdinaryDiffEqCore", "OrdinaryDiffEqLowOrderRK", "OrdinaryDiffEqTsit5", "SciMLBase"]
+path = "PrecompiledComparison"
+uuid = "40a49816-5504-4e76-a76f-35648eb70f99"
+version = "0.1.0"
 
 [[deps.Preferences]]
 deps = ["TOML"]
