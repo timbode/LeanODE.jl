@@ -7,7 +7,9 @@
         via_leanode = LeanODE.solve(LeanODE.ODEProblem(f!, u0, tspan, p), alg; reltol = 1e-8, abstol = 1e-8)
         direct = SciMLBase.solve(SciMLBase.ODEProblem(f!, u0, tspan, p), alg; reltol = 1e-8, abstol = 1e-8)
         @test via_leanode isa LeanODE.ODESolution
-        @test identical(via_leanode, direct)
+        @test isequal(via_leanode.t, direct.t) && isequal(via_leanode.u, direct.u)
+        @test same_counts(via_leanode, direct)
+        @test Symbol(via_leanode.retcode) == Symbol(direct.retcode)
     end
     early = LeanODE.solve(LeanODE.ODEProblem(f!, u0, tspan, p), OrdinaryDiffEqTsit5.Tsit5(); maxiters = 10, verbose = false)
     @test early.retcode == ReturnCode.MaxIters

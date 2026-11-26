@@ -47,10 +47,8 @@ new array.
 """
 function interp_at_saveat(Θ, integrator)
     y₁ = integrator.u
-    out = similar(y₁, eltype(first(y₁) * oneunit(Θ)))
-    copyto!(out, y₁)
     return interpolant!(
-        out, Θ, integrator.dt, integrator.uprev, y₁, integrator.k, integrator.cache
+        similar(y₁), Θ, integrator.dt, integrator.uprev, y₁, integrator.k, integrator.cache
     )
 end
 

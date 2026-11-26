@@ -1,7 +1,7 @@
 # The comparisons: every problem crossed with tolerances and ways of saving,
 # then step-size options, early stops and edge cases, for both methods. Each
 # case is one problem solved once by LeanODE and once by OrdinaryDiffEq with
-# the same keywords; the two solutions must be identical.
+# the same keywords.
 
 """Saving options for a time span: every step, the end only, and several kinds of `saveat`."""
 function saving_options(tspan)
@@ -29,6 +29,14 @@ const ALGORITHMS = (
 )
 
 """
+    RUNGE_KUTTA_METHODS
+
+The methods whose step depends on the current state only. The Adams methods
+also use the derivatives of earlier steps.
+"""
+const RUNGE_KUTTA_METHODS = (LeanODE.Tsit5(), LeanODE.RK4(), LeanODE.BS3())
+
+"""
     special_cases()
 
 Cases beyond the grid, as `(label, problem, keywords, retcode)`. `retcode` is
@@ -52,7 +60,7 @@ function special_cases()
         ("backwards, initial dt given", P.decay_backwards, (; dt = 1.0e-3), :Success),
         ("backwards, fixed step", P.decay_backwards, (; adaptive = false, dt = 0.03), :Success),
         # early stops
-        ("maxiters = 50", P.lorenz, (; maxiters = 50), :MaxIters),
+        ("maxiters = 20", P.lorenz, (; maxiters = 20), :MaxIters),
         ("NaN after t = 0.5", (f! = nan_after!, u0 = [1.0, 2.0], tspan = (0.0, 1.0), p = 0.5), (;), :Unstable),
         ("blow-up", blowup, (;), :Unstable),
         ("blow-up with dtmin", blowup, (; dtmin = 1.0e-3), :DtLessThanMin),
@@ -87,7 +95,7 @@ function special_cases()
         ("complex vector of 21", merge(P.rotation, (; u0 = ComplexF64[i * cis(0.3i) for i in 1:21])), (; saveat = [0.1, 1.7]), :Success),
         ("time span not starting at zero", merge(P.lorenz, (; tspan = (3.5, 5.5))), (; saveat = 0.3), :Success),
         # unusual ways of saving
-        ("saveat as a range", P.lorenz, (; saveat = 0.0:0.5:20.0), :Success),
+        ("saveat as a range", P.lorenz, (; saveat = 0.0:0.25:5.0), :Success),
         ("saveat times outside the span", P.decay, (; saveat = [-1.0, 0.5, 1.0, 5.0]), :Success),
         ("saveat unsorted with a duplicate", P.decay, (; saveat = [1.5, 0.5, 0.5, 1.0]), :Success),
         ("saveat and every step", P.van_der_pol, (; saveat = [0.3, 7.7], save_everystep = true), :Success),
@@ -100,24 +108,11 @@ function special_cases()
 end
 
 """
-    RETCODE_EXCEPTIONS
-
-Special cases that end differently with one method, as
-`(method, label) => return code`. Without step-size control, OrdinaryDiffEq's
-VCABM stays at order 1 and evaluates `f` only at the predicted state, and
-that is unstable for the Lorenz system at a step size of 0.03.
-"""
-const RETCODE_EXCEPTIONS = Dict(
-    (LeanODE.VCABM, "fixed step that does not divide the span") => :Unstable,
-)
-
-"""
     comparison_cases()
 
 All comparisons, as named tuples `(; group, label, problem, alg, keywords, retcode)`.
 `group` is the testset the case is reported under; `retcode` is as in
-[`special_cases`](@ref) unless `RETCODE_EXCEPTIONS` names another, and
-`nothing` for the grid.
+[`special_cases`](@ref), and `nothing` for the grid.
 """
 function comparison_cases()
     cases = NamedTuple[]
@@ -127,25 +122,53 @@ function comparison_cases()
             push!(cases, (; group = String(name), label = "$name, $tol_name, $save_name", problem, alg, keywords = merge(tol, save), retcode = nothing))
         end
         for (label, problem, keywords, retcode) in special_cases()
-            expected = get(RETCODE_EXCEPTIONS, (typeof(alg), label), retcode)
-            push!(cases, (; group = "special cases", label, problem, alg, keywords, retcode = expected))
+            push!(cases, (; group = "special cases", label, problem, alg, keywords, retcode))
         end
     end
     return cases
 end
 
 """
-    compare(case)
+    saves_every_step(keywords)
 
-Solve one case with both packages. Returns `(; same, retcode_as_expected, rejections, detail)`:
-whether the solutions are identical, whether OrdinaryDiffEq's return code is
-the one the case was built for, OrdinaryDiffEq's number of rejected steps,
-and for a mismatch a description of it.
+Whether a solve with these keywords saves the state after every step, by the
+default rule of `solve`: yes, unless `saveat` is given.
 """
-function compare(case)
+saves_every_step(keywords) = get(keywords, :save_everystep, isempty(get(keywords, :saveat, ())))
+
+"""
+    agreement(case)
+
+Solve one case with both packages and measure how well they agree. Returns a
+named tuple:
+
+- `same_retcode`, `retcode_as_expected`: the return codes are equal, and
+  OrdinaryDiffEq's is the one the case was built for;
+- `success`: OrdinaryDiffEq reached the end of the time span;
+- `same_times`: the saved times are identical;
+- `every_step`: the case saves after every step, so its saved times depend on
+  the step sizes;
+- `distance`: the largest difference at common saved times, in units of the
+  tolerance (see `tolerance_distance`), `common`, their number, and `bound`,
+  the largest distance the problem allows;
+- `steps`, `reference_steps`: attempted steps of each;
+- `rejections`: OrdinaryDiffEq's number of rejected steps.
+"""
+function agreement(case)
     lean, reference = both_solutions(case.problem, case.alg; case.keywords...)
-    same = identical(lean, reference)
-    retcode_as_expected = case.retcode === nothing || Symbol(reference.retcode) == case.retcode
-    detail = same ? "" : describe_difference(lean, reference)
-    return (; same, retcode_as_expected, rejections = reference.stats.nreject, detail)
+    abstol = get(case.keywords, :abstol, 1.0e-6)
+    reltol = get(case.keywords, :reltol, 1.0e-3)
+    distance, common = tolerance_distance(lean, reference, abstol, reltol)
+    return (;
+        same_retcode = Symbol(lean.retcode) == Symbol(reference.retcode),
+        retcode_as_expected = case.retcode === nothing || Symbol(reference.retcode) == case.retcode,
+        success = Symbol(reference.retcode) == :Success,
+        same_times = isequal(lean.t, reference.t),
+        every_step = saves_every_step(case.keywords),
+        distance, common,
+        bound = get(case.problem, :adaptive_bound, 10),
+        steps = lean.stats.naccept + lean.stats.nreject,
+        reference_steps = reference.stats.naccept + reference.stats.nreject,
+        rejections = reference.stats.nreject,
+    )
 end

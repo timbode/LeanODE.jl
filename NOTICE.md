@@ -1,16 +1,17 @@
-# Copied code
+# Code from other packages
 
-LeanODE's methods are copied from OrdinaryDiffEq.jl and its base packages, so
-that LeanODE's results are identical, bit for bit, to theirs. Each entry names
-the source file and the version it was copied from. Their licences are in
-`LICENSE.md`.
+LeanODE's methods are taken from OrdinaryDiffEq.jl and its base packages.
+Each entry names the source file and the version it was taken from. Their
+licences are in `LICENSE.md`. The step loop, the step-size control and the
+saving are copied. In the methods themselves, the coefficients and formulas
+are OrdinaryDiffEq's and the loops over the state are LeanODE's own
+(`src/kernels.jl`, `src/hermite.jl`, `src/adams_utils.jl`).
 
 | LeanODE file | Copied from |
 |---|---|
-| `src/vendor/MuladdMacro.jl` | MuladdMacro.jl 0.2.7, `src/MuladdMacro.jl` |
 | `src/vendor/FastPower.jl` | FastPower.jl 1.5.1, `src/FastPower.jl` |
-| `src/vendor/FastBroadcast.jl` | FastBroadcast.jl 1.5.1, `src/FastBroadcast.jl`, `ext/FastBroadcastStaticExt.jl`; `indices_do_not_alias` from ArrayInterface.jl 7.30.2 |
-| `src/defaults.jl` | DiffEqBase.jl 6.218.0, `src/common_defaults.jl`, `src/calculate_residuals.jl`, `src/utils.jl` |
+| `src/defaults.jl` | DiffEqBase.jl 6.218.0, `src/common_defaults.jl`, `src/utils.jl` |
+| `src/kernels.jl` | the error scaling of DiffEqBase.jl 6.218.0, `src/calculate_residuals.jl` |
 | `src/misc_utils.jl` | OrdinaryDiffEqCore.jl 3.33.1, `src/misc_utils.jl`; RecursiveArrayTools.jl 3.54.0, `src/utils.jl` |
 | `src/integrator.jl` | OrdinaryDiffEqCore.jl 3.33.1, `src/integrators/type.jl` (reduced) |
 | `src/initdt.jl` | OrdinaryDiffEqCore.jl 3.33.1, `src/initdt.jl` |
@@ -24,4 +25,5 @@ the source file and the version it was copied from. Their licences are in
 | `src/adams_caches.jl` | OrdinaryDiffEqAdamsBashforthMoulton.jl 1.11.0, `src/algorithms.jl`, `src/alg_utils.jl`, `src/adams_bashforth_moulton_caches.jl` |
 | `src/adams_utils.jl` | OrdinaryDiffEqAdamsBashforthMoulton.jl 1.11.0, `src/adams_utils.jl` |
 | `src/adams_perform_step.jl` | OrdinaryDiffEqAdamsBashforthMoulton.jl 1.11.0, `src/adams_bashforth_moulton_perform_step.jl` |
-| `src/hermite.jl` | OrdinaryDiffEqCore.jl 3.33.1, `src/dense/generic_dense.jl` |
+| `src/hermite.jl` | the interpolant of OrdinaryDiffEqCore.jl 3.33.1, `src/dense/generic_dense.jl` |
+| `test/vcabm_reference.jl` | OrdinaryDiffEqAdamsBashforthMoulton.jl 1.11.0, `src/adams_bashforth_moulton_perform_step.jl` (one method, with the order-1 fix of [SciML/OrdinaryDiffEq.jl#5056](https://github.com/SciML/OrdinaryDiffEq.jl/pull/5056)) |

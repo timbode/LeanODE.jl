@@ -1,6 +1,6 @@
 name = "LeanODE"
 uuid = "c86d6785-5fd8-4c08-817e-7d1d1bc4b9b4"
-version = "0.1.0"
+version = "0.2.0"
 authors = ["Tim Bode"]
 
 [compat]

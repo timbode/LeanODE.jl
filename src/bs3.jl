@@ -1,7 +1,8 @@
-# Copied from OrdinaryDiffEqLowOrderRK 1.13.0 (src/low_order_rk_tableaus.jl,
+# After OrdinaryDiffEqLowOrderRK 1.13.0 (src/low_order_rk_tableaus.jl,
 # src/low_order_rk_caches.jl, src/low_order_rk_perform_step.jl), MIT licence;
 # see LICENSE.md. Only the in-place method for `Array` states is kept, without
-# stage and step limiters; the broadcasts stay `@..`, as in tsit5.jl.
+# stage and step limiters. The method and its coefficients are
+# OrdinaryDiffEq's; the loops over the state are LeanODE's own (kernels.jl).
 
 """
     BS3()
@@ -67,21 +68,16 @@ end
     BS3Cache
 
 Work arrays of BS3: the stage derivatives `fsalfirst` (`k1`), `k2`, `k3` and
-`k4` (`f` at the new state), the error estimate `utilde`, a stage state
-`tmp`, the scaled error `atmp`, and the coefficients `tab`. `thread` selects
-FastBroadcast's serial kernel. The struct is mutable because `fsalfirst` and
-`k4` change places after every accepted step (see `exchange_fsal!`).
+`k4` (`f` at the new state), and a stage state `tmp`. The struct is mutable
+because `fsalfirst` and `k4` change places after every accepted step (see
+`exchange_fsal!`).
 """
-mutable struct BS3Cache{uType, TabType}
+mutable struct BS3Cache{uType}
     fsalfirst::uType
     k2::uType
     k3::uType
     k4::uType
-    utilde::uType
     tmp::uType
-    atmp::uType
-    tab::TabType
-    thread::FastBroadcast.False
 end
 
 """
@@ -90,16 +86,10 @@ end
 Allocate the work arrays of BS3 for states like `u`.
 """
 function alg_cache(::BS3, u, rate_prototype, uprev)
-    tab = BS3ConstantCache(constvalue(recursive_unitless_bottom_eltype(u)), Float64)
-    k1 = zero(rate_prototype)
-    k2 = zero(rate_prototype)
-    k3 = zero(rate_prototype)
-    k4 = zero(rate_prototype)
-    utilde = zero(u)
-    atmp = similar(u, eltype(u))
-    fill!(atmp, false)
-    tmp = zero(u)
-    return BS3Cache(k1, k2, k3, k4, utilde, tmp, atmp, tab, FastBroadcast.False())
+    return BS3Cache(
+        zero(rate_prototype), zero(rate_prototype), zero(rate_prototype),
+        zero(rate_prototype), zero(u)
+    )
 end
 
 """
@@ -145,30 +135,23 @@ in `integrator.EEst`. The first stage derivative is read from
 `integrator.fsalfirst`, so the function also serves a method that uses BS3
 for its first steps and keeps its own array for `f(uprev)`.
 """
-@muladd function perform_step!(integrator, cache::BS3Cache)
+function perform_step!(integrator, cache::BS3Cache)
     (; t, dt, uprev, u, f, p) = integrator
-    (; k2, k3, k4, utilde, tmp, atmp, thread) = cache
-    (; a21, a32, a41, a42, a43, c1, c2, btilde1, btilde2, btilde3, btilde4) = cache.tab
+    (; k2, k3, k4, tmp) = cache
+    (; a21, a32, a41, a42, a43, c1, c2, btilde1, btilde2, btilde3, btilde4) = BS3ConstantCache(Float64, Float64)
     k1 = integrator.fsalfirst
-    a1 = dt * a21
-    @.. broadcast = false thread = thread tmp = uprev + a1 * k1
+    combine!(tmp, uprev, dt * a21, k1)
     f(k2, tmp, p, t + c1 * dt)
-    a2 = dt * a32
-    @.. broadcast = false thread = thread tmp = uprev + a2 * k2
+    combine!(tmp, uprev, dt * a32, k2)
     f(k3, tmp, p, t + c2 * dt)
-    @.. broadcast = false thread = thread u = uprev + dt * (a41 * k1 + a42 * k2 + a43 * k3)
+    combine!(u, uprev, dt * a41, k1, dt * a42, k2, dt * a43, k3)
     f(k4, u, p, t + dt)
     integrator.stats.nf += 3
     if integrator.opts.adaptive
-        @.. broadcast = false thread = thread utilde = dt * (
-            btilde1 * k1 + btilde2 * k2 +
-                btilde3 * k3 + btilde4 * k4
+        integrator.EEst = error_norm(
+            uprev, u, integrator.opts.abstol, integrator.opts.reltol,
+            dt * btilde1, k1, dt * btilde2, k2, dt * btilde3, k3, dt * btilde4, k4
         )
-        calculate_residuals!(
-            atmp, utilde, uprev, u, integrator.opts.abstol,
-            integrator.opts.reltol, ode_default_norm, t
-        )
-        integrator.EEst = ode_default_norm(atmp, t)
     end
     return nothing
 end
