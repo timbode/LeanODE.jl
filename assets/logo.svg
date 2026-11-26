@@ -1,0 +1,15 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="46 32 110 106" width="110" height="106" role="img" aria-label="LeanODE.jl">
+<g>
+<circle cx="62" cy="44" r="10" fill="#389826"/>
+<circle cx="62" cy="70" r="10" fill="#389826"/>
+<circle cx="88" cy="70" r="10" fill="#CB3C33"/>
+<circle cx="62" cy="96" r="10" fill="#389826"/>
+<circle cx="88" cy="96" r="10" fill="#CB3C33"/>
+<circle cx="114" cy="96" r="10" fill="#9558B2"/>
+<line x1="50" y1="111" x2="152" y2="111" stroke="#9aa4a4" stroke-width="2.5" stroke-linecap="round"/>
+<circle cx="62" cy="126" r="10" fill="#389826"/>
+<circle cx="88" cy="126" r="10" fill="#CB3C33"/>
+<circle cx="114" cy="126" r="10" fill="#9558B2"/>
+<circle cx="140" cy="126" r="10" fill="#4063D8"/>
+</g>
+</svg>
