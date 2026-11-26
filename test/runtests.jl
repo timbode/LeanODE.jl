@@ -11,6 +11,10 @@ import OrdinaryDiffEqCore, OrdinaryDiffEqTsit5, OrdinaryDiffEqLowOrderRK,
     OrdinaryDiffEqAdamsBashforthMoulton, DiffEqBase, SciMLBase, FastPower
 using Logging: NullLogger, with_logger
 
+# LeanODE's VCABM fixes a defect of OrdinaryDiffEq's at order 1, so its
+# reference is OrdinaryDiffEq's step with the same fix.
+Base.include(OrdinaryDiffEqAdamsBashforthMoulton, joinpath(@__DIR__, "vcabm_reference.jl"))
+
 # The bounds in test_agreement.jl were measured against these versions, and
 # the code was written from them, so the suite stops if the environment drifted.
 const REFERENCE = [

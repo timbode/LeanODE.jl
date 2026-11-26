@@ -184,7 +184,8 @@ per step, up to 3; later `choose_order!` decides.
 
 As in OrdinaryDiffEq, the predictor has at least one term, also at order 1,
 and without step-size control neither `f(u)` is evaluated nor the order
-changed.
+changed. Unlike OrdinaryDiffEq up to version 2.2.1 of its Adams package, the
+order-1 step is `uprev + g[1] f(predictor)` (see `correct_first_order!`).
 """
 function perform_step!(integrator, cache::VCABMCache)
     (; t, dt, uprev, u, f, p) = integrator

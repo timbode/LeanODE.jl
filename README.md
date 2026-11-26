@@ -37,3 +37,11 @@ component and differ only in the error norm.
 
 The tests bound all three against OrdinaryDiffEq at the versions pinned in
 `test/Project.toml`.
+
+`VCABM` differs on purpose at order 1. In OrdinaryDiffEqAdamsBashforthMoulton
+up to version 2.2.1, a step at order 1 advances by twice the slope. Every
+solve starts at order 1, and without step-size control the order stays 1.
+LeanODE has the fix of
+[SciML/OrdinaryDiffEq.jl#5056](https://github.com/SciML/OrdinaryDiffEq.jl/pull/5056),
+and the tests compare its `VCABM` with OrdinaryDiffEq's step with the same
+fix.

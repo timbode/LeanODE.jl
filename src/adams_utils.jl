@@ -423,6 +423,14 @@ end
 
 `correct_block!` for order 1, where the corrector's term is `g[1] du`
 itself. Returns the sum of the squared scaled error estimates.
+
+At order 1 the predictor `u = uprev + g[1] f(uprev)` is an Euler step, and
+its term is not one of the corrector's. The corrector therefore starts from
+`uprev`, not from `u`: `u = uprev + g[1] du` with `du = f(u)`. The error
+estimate `(g[2] - g[1]) (du - f(uprev))` then measures the difference to the
+trapezoidal rule. OrdinaryDiffEqAdamsBashforthMoulton up to 2.2.1 adds the
+corrector's term to the predictor, so that its step advances by twice the
+slope.
 """
 @inline function correct_first_order!(block, u, uprev, du, cache, abstol, reltol)
     (; g) = cache
@@ -431,7 +439,7 @@ itself. Returns the sum of the squared scaled error estimates.
     weight = g[2] - g[1]
     total = 0.0
     @inbounds @simd ivdep for i in block
-        corrected = muladd(g₁, du[i], u[i])
+        corrected = muladd(g₁, du[i], uprev[i])
         u[i] = corrected
         ψ₂ = du[i] - ϕstar₁[i]
         total += abs2(weight * ψ₂ * inverse_scale(uprev[i], corrected, abstol, reltol))
