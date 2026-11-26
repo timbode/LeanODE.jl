@@ -19,25 +19,52 @@ function default_tolerance(u, scale)
 end
 
 """
-    initialize_saveat(saveat, tspan)
+    SaveAt
+
+The `saveat` keyword in one concrete type, whatever the caller passed: a
+number, a range, a vector, a tuple or nothing. The solver's types do not
+depend on it, so a new kind of `saveat` compiles only the keyword handling,
+not the whole solver.
+
+# Fields
+- `times`: the times as given, converted to `Float64`. A number is stored as
+  its one value, so `t ∈ times` and `isempty(times)` answer as they do for
+  the number itself.
+- `periodic`: the caller gave a number, meaning every `times[1]` time units.
+"""
+struct SaveAt
+    times::Vector{Float64}
+    periodic::Bool
+end
+
+"""
+    SaveAt(saveat)
+
+Convert the `saveat` keyword: a number becomes a period, any other
+collection its times.
+"""
+SaveAt(saveat::Number) = SaveAt([Float64(saveat)], true)
+SaveAt(saveat) = SaveAt(Float64[t for t in saveat], false)
+
+"""
+    initialize_saveat(saveat::SaveAt, tspan)
 
 The times to save at strictly after `tspan[1]` and up to `tspan[2]`,
-multiplied by the time direction and sorted ascending. `saveat` is a
-collection of times, or a number meaning every `saveat` time units.
+multiplied by the time direction and sorted ascending.
 """
-function initialize_saveat(saveat, tspan)
+function initialize_saveat(saveat::SaveAt, tspan)
     saveat_internal = Float64[]
     t0, tf = tspan
     tdir = sign(tf - t0)
     tdir_t0 = tdir * t0
     tdir_tf = tdir * tf
-    if saveat isa Number
-        directional_saveat = tdir * abs(saveat)
+    if saveat.periodic
+        directional_saveat = tdir * abs(only(saveat.times))
         for t in (t0 + directional_saveat):directional_saveat:tf
             push!(saveat_internal, tdir * t)
         end
-    elseif !isempty(saveat)
-        for t in saveat
+    else
+        for t in saveat.times
             tdir_t = tdir * t
             tdir_t0 < tdir_t ≤ tdir_tf && push!(saveat_internal, tdir_t)
         end
@@ -72,8 +99,8 @@ function build_options(prob, alg, settings)
     order = alg_order(alg)
     save_end_user = save_end
     save_end = save_end === nothing ?
-        save_everystep || isempty(saveat) || saveat isa Number ||
-        tspan[2] in saveat : save_end
+        save_everystep || isempty(saveat.times) || saveat.periodic ||
+        tspan[2] in saveat.times : save_end
 
     return Options(
         maxiters, save_everystep, adaptive, abstol_internal, reltol_internal,
@@ -85,7 +112,7 @@ function build_options(prob, alg, settings)
         convert(QT, 1 // 10^4),     # qoldinit
         convert(QT, pi_beta1(order)), convert(QT, pi_beta2(order)),
         Float64(dtmax), Float64(dtmin),
-        [tdir * tspan[2]], initialize_saveat(saveat, tspan), saveat,
+        [tdir * tspan[2]], initialize_saveat(saveat, tspan), saveat.times,
         save_start, save_end, save_end_user
     )
 end
@@ -113,8 +140,8 @@ function init(
         maxiters = 1000000
     )
     settings = (;
-        saveat, save_everystep, save_start, save_end, dt, dtmin, dtmax,
-        adaptive, abstol, reltol, maxiters,
+        saveat = SaveAt(saveat), save_everystep, save_start, save_end, dt,
+        dtmin, dtmax, adaptive, abstol, reltol, maxiters,
     )
     return init(prob, alg, settings)
 end

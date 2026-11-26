@@ -21,9 +21,10 @@ Settings of one solve, fixed when it starts (OrdinaryDiffEq's `DEOptions`).
   and sorted ascending; only the end of the time span here.
 - `saveat`: the remaining times to save at, likewise multiplied by the time
   direction and sorted ascending.
-- `saveat_cache`: the `saveat` the caller passed.
+- `saveat_cache`: the times of the `saveat` the caller passed, as given (see
+  [`SaveAt`](@ref)).
 """
-struct Options{S}
+struct Options
     maxiters::Int
     save_everystep::Bool
     adaptive::Bool
@@ -41,7 +42,7 @@ struct Options{S}
     dtmin::Float64
     tstops::Vector{Float64}
     saveat::Vector{Float64}
-    saveat_cache::S
+    saveat_cache::Vector{Float64}
     save_start::Bool
     save_end::Bool
     save_end_user::Union{Nothing, Bool}
@@ -71,12 +72,12 @@ step, `qold` and `q11` are the PI controller's memory, `dtpropose` is the
 proposed next step size, and the flags record whether the last step was
 accepted and whether the next one ends exactly on a stop time.
 """
-mutable struct Integrator{uType, F, P, Alg, Cache, S}
+mutable struct Integrator{uType, F, P, Alg, Cache}
     f::F
     p::P
     alg::Alg
     cache::Cache
-    opts::Options{S}
+    opts::Options
     stats::Stats
     tdir::Float64
     u::uType
