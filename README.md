@@ -1,3 +1,5 @@
+<p align="center"><img src="assets/logo.svg" alt="LeanODE.jl logo" width="140"></p>
+
 # LeanODE
 
 LeanODE solves ordinary differential equations with methods taken from
